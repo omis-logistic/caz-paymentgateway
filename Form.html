@@ -1,8 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <base target="_top">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, shrink-to-fit=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
       :root {
         --gold: #D4AF37;
@@ -20,8 +19,6 @@
         font-family: Arial, sans-serif;
         margin: 0;
         padding: 0;
-        width: 100vw;
-        overflow-x: hidden;
         background: var(--white);
         color: var(--text-dark);
         font-size: 14px;
@@ -33,7 +30,7 @@
 
       .container {
         width: 100%;
-        max-width: 100%;
+        max-width: 600px;
         margin: 0 auto;
         flex: 1;
       }
@@ -100,7 +97,6 @@
         }
 
         .container {
-          width: 600px;
           border-radius: 10px;
           box-shadow: 0 2px 15px rgba(0,0,0,0.1);
         }
@@ -121,33 +117,6 @@
           min-width: 160px;
         }
       }
-     
-  /* Add these lines at the bottom of your existing styles */
-  body {
-    margin-top: -40px !important; /* Compensate for banner height */
-  }
-  
-  /* Completely hide the banner */
-  .ss-branding {
-    display: none !important;
-    height: 0 !important;
-    visibility: hidden !important;
-  }
-  
-  .ss-logo-container {
-    display: none !important;
-  }
-      /* Banner Removal CSS */
-    #warning {
-      display: none !important;
-      height: 0 !important;
-      overflow: hidden !important;
-    }
-    
-    body {
-      margin-top: 0 !important;
-    }
-
     </style>
   </head>
   <body>
@@ -157,10 +126,10 @@
       </div>
       
       <div class="content">
-        <p><strong>Order Number:</strong> <?= orderNumber ?></p>
-        <p><strong>Code:</strong> <?= orderData.code ?></p>
-        <p><strong>Name:</strong> <?= orderData.name ?></p>
-        <p><strong>Price:</strong> $<?= orderData.price ?></p>
+        <p><strong>Order Number:</strong> <span id="displayOrderNumber"></span></p>
+        <p><strong>Code:</strong> <span id="displayCode"></span></p>
+        <p><strong>Name:</strong> <span id="displayName"></span></p>
+        <p><strong>Price:</strong> $<span id="displayPrice"></span></p>
         
         <hr>
         
@@ -172,11 +141,11 @@
         </div>
         
         <form id="paymentForm">
-          <input type="hidden" name="orderNumber" value="<?= orderNumber ?>">
-          <input type="hidden" name="code" value="<?= orderData.code ?>">
-          <input type="hidden" name="name" value="<?= orderData.name ?>">
-          <input type="hidden" name="price" value="<?= orderData.price ?>">
-          <input type="hidden" name="branchPhone" value="<?= orderData.branchPhone ?>">
+          <input type="hidden" id="orderNumber" name="orderNumber">
+          <input type="hidden" id="code" name="code">
+          <input type="hidden" id="name" name="name">
+          <input type="hidden" id="price" name="price">
+          <input type="hidden" id="branchPhone" name="branchPhone">
           
           <p>Upload payment screenshot:</p>
           <input type="file" name="uploadFile" accept="image/*" required>
@@ -185,72 +154,102 @@
       </div>
     </div>
 
-     <script>
-    // ===== BANNER REMOVAL =====
-    function killBanner() {
-      try {
-        const closeButton = document.querySelector("#warning > div.warning-banner-close-icon");
-        if(closeButton) {
-          closeButton.click();
-          document.body.style.marginTop = "0";
-          
-          // Remove banner element completely
-          const banner = document.getElementById("warning");
-          if(banner) banner.remove();
-        }
-      } catch(error) {
-        console.log("Banner already removed");
-      }
-    }
+    <script>
+      // Replace with your deployed Apps Script URL
+      const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwDxEfFwuREacfQEqY7y2h1JGGvlWtQJzoVlY8hYgisjAPcRHVg72z3Blxe1d0yxSi_/exec';
 
-    // Triple-phase removal strategy
-    window.addEventListener('DOMContentLoaded', () => {
-      // Immediate removal
-      killBanner();
-      
-      // Monitor DOM changes
-      const observer = new MutationObserver((mutations) => {
-        mutations.forEach(() => {
-          if(document.querySelector("#warning")) {
-            killBanner();
-            observer.disconnect();
-          }
-        });
-      });
-
-      observer.observe(document.body, {
-        childList: true,
-        subtree: true
-      });
-
-      // Final cleanup after 1 second
-      setTimeout(() => {
-        killBanner();
-        document.body.style.marginTop = "0";
-        document.documentElement.style.overflow = "visible";
-      }, 1000);
-    });
-    
-      async function copyToClipboard() {
-        try {
-          await navigator.clipboard.writeText(document.getElementById('accNum').innerText);
-          alert('Account number copied to clipboard!');
-        } catch (err) {
-          alert('Failed to copy! Please manually select the text.');
-        }
-      }
-
-      document.getElementById('paymentForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const file = e.target.uploadFile.files[0];
+      // Initialize on load
+      (async function init() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const orderNumber = urlParams.get('orderNumber');
         
-        if (!file) {
-          alert('Please select a payment screenshot first!');
+        if (!orderNumber) {
+          showError('Order number required in URL parameters');
           return;
         }
 
-        // Show loading state
-        const originalContent = document.body.innerHTML;
+        try {
+          const response = await fetch(`${SCRIPT_URL}?orderNumber=${orderNumber}`);
+          const data = await response.json();
+          
+          if (!data.success) throw new Error(data.error);
+          
+          document.getElementById('displayOrderNumber').textContent = orderNumber;
+          document.getElementById('displayCode').textContent = data.data.code;
+          document.getElementById('displayName').textContent = data.data.name;
+          document.getElementById('displayPrice').textContent = data.data.price;
+          
+          document.getElementById('orderNumber').value = orderNumber;
+          document.getElementById('code').value = data.data.code;
+          document.getElementById('name').value = data.data.name;
+          document.getElementById('price').value = data.data.price;
+          document.getElementById('branchPhone').value = data.data.branchPhone;
+
+        } catch (error) {
+          showError(error.message);
+        }
+      })();
+
+      function copyToClipboard() {
+        navigator.clipboard.writeText(document.getElementById('accNum').innerText)
+          .then(() => alert('Account number copied!'))
+          .catch(() => alert('Failed to copy!'));
+      }
+
+      async function handleFormSubmit(e) {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const file = formData.get('uploadFile');
+        
+        if (!file) {
+          alert('Please select a payment screenshot!');
+          return;
+        }
+
+        showLoadingState();
+
+        try {
+          const base64Data = await readFileAsBase64(file);
+          const payload = {
+            orderNumber: document.getElementById('orderNumber').value,
+            code: document.getElementById('code').value,
+            name: document.getElementById('name').value,
+            price: document.getElementById('price').value,
+            branchPhone: document.getElementById('branchPhone').value,
+            upload: {
+              name: file.name,
+              data: base64Data,
+              contentType: file.type
+            }
+          };
+
+          const response = await fetch(SCRIPT_URL, {
+            method: 'POST',
+            body: JSON.stringify(payload),
+            headers: { 'Content-Type': 'application/json' }
+          });
+          
+          const result = await response.json();
+          if (!result.success) throw new Error(result.error);
+          
+          showSuccessScreen(result);
+
+        } catch (error) {
+          showError(error.message);
+          restoreForm();
+        }
+      }
+
+      function readFileAsBase64(file) {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result.split(',')[1]);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+      }
+
+      function showLoadingState() {
         document.body.innerHTML = `
           <div class="container">
             <div class="header">
@@ -259,42 +258,18 @@
             <div class="content">
               <p>Please wait while we process your payment...</p>
             </div>
-          </div>
-        `;
+          </div>`;
+      }
 
-        try {
-          const data = await new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = (fileEvent) => {
-              google.script.run
-                .withSuccessHandler(resolve)
-                .withFailureHandler(reject)
-                .uploadFile({
-                  upload: {
-                    name: file.name,
-                    data: fileEvent.target.result.split(',')[1],
-                    contentType: file.type
-                  },
-                  orderNumber: '<?= orderNumber ?>',
-                  code: '<?= orderData.code ?>',
-                  name: '<?= orderData.name ?>',
-                  price: '<?= orderData.price ?>',
-                  branchPhone: '<?= orderData.branchPhone ?>'
-                });
-            };
-            reader.readAsDataURL(file);
-          });
-
-          // Construct WhatsApp message
-          const message = `Payment Confirmation
+      function showSuccessScreen(data) {
+        const message = `Payment Confirmation
 Order Number: ${data.orderNumber}
 Code: ${data.code}
 Name: ${data.name}
 Price: $${data.price}
-Screenshot: ${data.url}`;
+Receipt: ${data.url}`;
 
-          // Update confirmation display
-          document.body.innerHTML = `
+        document.body.innerHTML = `
           <div class="container">
             <div class="header">
               <h1>Payment Confirmed</h1>
@@ -307,16 +282,31 @@ Screenshot: ${data.url}`;
               <p><strong>Screenshot:</strong> <a href="${data.url}" target="_blank">View Receipt</a></p>
               <button onclick="window.open('https://wa.me/${data.branchPhone}?text=${encodeURIComponent(message)}', '_blank')" 
                 class="copy-btn">
-          Send via WhatsApp
-        </button>
-      </div>
-    </div>
-          `;
-        } catch (error) {
-          alert('Error: ' + error.message);
-          document.body.innerHTML = originalContent;
-        }
-      });
+                Send via WhatsApp
+              </button>
+            </div>
+          </div>`;
+      }
+
+      function showError(message) {
+        document.body.innerHTML = `
+          <div class="container">
+            <div class="header">
+              <h1>⚠️ Error</h1>
+            </div>
+            <div class="content">
+              <p>${message}</p>
+              <p>Please contact support with your order number</p>
+            </div>
+          </div>`;
+      }
+
+      function restoreForm() {
+        window.location.reload();
+      }
+
+      // Event listeners
+      document.getElementById('paymentForm').addEventListener('submit', handleFormSubmit);
     </script>
   </body>
 </html>
