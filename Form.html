@@ -4,7 +4,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>CAZ Payment Gateway</title>
     <style>
-        /* === Base Styles === */
         :root {
             --gold: #D4AF37;
             --error-red: #dc3545;
@@ -43,7 +42,6 @@
             text-align: center;
         }
 
-        /* === Form Elements === */
         .form-group {
             margin-bottom: 20px;
         }
@@ -56,7 +54,7 @@
             margin: 15px 0;
         }
 
-        button, .btn {
+        button {
             background: var(--gold);
             color: white;
             border: none;
@@ -72,7 +70,6 @@
             opacity: 0.9;
         }
 
-        /* === Status Messages === */
         .loading {
             text-align: center;
             padding: 20px;
@@ -106,15 +103,14 @@
         </div>
 
         <div id="content">
-            <!-- Content populated by JavaScript -->
             <div class="loading">Loading order details...</div>
         </div>
     </div>
 
     <script>
-        // ===== Configuration =====
         const CONFIG = {
-            scriptUrl: "https://script.google.com/macros/s/AKfycbwDxEfFwuREacfQEqY7y2h1JGGvlWtQJzoVlY8hYgisjAPcRHVg72z3Blxe1d0yxSi_/exec",  // Replace with your deployed script URL
+            scriptUrl: "YOUR_DEPLOYED_SCRIPT_URL", // Replace with actual URL
+            timeout: 30000, // 30 seconds
             whatsappFormat: `Payment Confirmation
 Order Number: {orderNumber}
 Code: {code}
@@ -123,42 +119,43 @@ Price: ${"$"}{price}
 Receipt: {url}`
         };
 
-        // ===== Initialization =====
-        document.addEventListener('DOMContentLoaded', async () => {
+        // Initialize application
+        (function init() {
             try {
                 const urlParams = new URLSearchParams(window.location.search);
                 const orderNumber = urlParams.get('orderNumber');
 
-                if (!orderNumber) {
-                    showError('Order number is required in URL parameters');
+                if (!validateOrderNumber(orderNumber)) {
+                    showError('Invalid or missing order number in URL');
                     return;
                 }
 
-                const orderData = await fetchOrderDetails(orderNumber);
-                renderPaymentForm(orderNumber, orderData);
+                loadOrderDetails(orderNumber);
             } catch (error) {
-                showError(error.message);
+                showError(`Initialization failed: ${error.message}`);
             }
-        });
+        })();
 
-        // ===== Core Functions =====
-        async function fetchOrderDetails(orderNumber) {
+        async function loadOrderDetails(orderNumber) {
             try {
-                const response = await fetch(`${CONFIG.scriptUrl}?orderNumber=${encodeURIComponent(orderNumber)}`);
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), CONFIG.timeout);
+
+                const response = await fetch(
+                    `${CONFIG.scriptUrl}?orderNumber=${encodeURIComponent(orderNumber)}`,
+                    { signal: controller.signal }
+                );
+
+                clearTimeout(timeoutId);
+
+                if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
                 
-                if (!response.ok) {
-                    throw new Error(`Server error: ${response.status}`);
-                }
-
                 const data = await response.json();
+                if (!data.success) throw new Error(data.error || 'Order load failed');
 
-                if (!data.success) {
-                    throw new Error(data.error || 'Failed to load order details');
-                }
-
-                return data.data;
+                renderPaymentForm(orderNumber, data.data);
             } catch (error) {
-                throw new Error(`Failed to fetch order details: ${error.message}`);
+                handleNetworkError(error, () => loadOrderDetails(orderNumber));
             }
         }
 
@@ -199,25 +196,23 @@ Receipt: {url}`
             `;
 
             document.getElementById('content').innerHTML = content;
-            setupFormSubmission();
+            setupFormSubmission(orderNumber);
         }
 
-        // ===== Form Handling =====
-        function setupFormSubmission() {
+        function setupFormSubmission(orderNumber) {
             document.getElementById('paymentForm').addEventListener('submit', async (e) => {
                 e.preventDefault();
                 
                 try {
                     const formData = new FormData(e.target);
-                    const fileInput = formData.get('receipt');
+                    const file = formData.get('receipt');
                     
-                    if (!fileInput) {
-                        throw new Error('Please select a payment receipt');
+                    if (!file || !validateFile(file)) {
+                        throw new Error('Invalid file. Please upload a PNG, JPG, or JPEG image (max 5MB)');
                     }
 
                     showLoading('Processing payment...');
-                    
-                    const result = await submitPayment(formData);
+                    const result = await submitPayment(formData, file);
                     showConfirmation(result);
                 } catch (error) {
                     showError(error.message);
@@ -225,52 +220,73 @@ Receipt: {url}`
             });
         }
 
-        async function submitPayment(formData) {
-            const file = formData.get('receipt');
-            const reader = new FileReader();
+        async function submitPayment(formData, file) {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), CONFIG.timeout);
 
+            try {
+                const fileData = await readFile(file);
+                const response = await fetch(CONFIG.scriptUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        upload: fileData,
+                        orderNumber: formData.get('orderNumber'),
+                        code: formData.get('code'),
+                        name: formData.get('name'),
+                        price: formData.get('price'),
+                        branchPhone: formData.get('branchPhone')
+                    }),
+                    signal: controller.signal
+                });
+
+                clearTimeout(timeoutId);
+
+                if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
+                
+                const data = await response.json();
+                if (!data.success) throw new Error(data.error || 'Payment failed');
+
+                return data.data;
+            } catch (error) {
+                handleNetworkError(error, () => submitPayment(formData, file));
+                throw error;
+            }
+        }
+
+        // Helper functions
+        function validateOrderNumber(orderNumber) {
+            return orderNumber && orderNumber.trim().length > 5;
+        }
+
+        function validateFile(file) {
+            const validTypes = ['image/jpeg', 'image/png', 'image/jpg'];
+            return file && validTypes.includes(file.type) && file.size <= 5 * 1024 * 1024;
+        }
+
+        function readFile(file) {
             return new Promise((resolve, reject) => {
-                reader.onload = async () => {
-                    try {
-                        const response = await fetch(CONFIG.scriptUrl, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                upload: {
-                                    name: file.name,
-                                    data: reader.result.split(',')[1],
-                                    contentType: file.type
-                                },
-                                orderNumber: formData.get('orderNumber'),
-                                code: formData.get('code'),
-                                name: formData.get('name'),
-                                price: formData.get('price'),
-                                branchPhone: formData.get('branchPhone')
-                            })
-                        });
-
-                        const data = await response.json();
-                        
-                        if (!data.success) {
-                            throw new Error(data.error || 'Payment submission failed');
-                        }
-
-                        resolve(data.data);
-                    } catch (error) {
-                        reject(error);
-                    }
-                };
-                reader.onerror = () => reject('Error reading file');
+                const reader = new FileReader();
+                reader.onload = () => resolve({
+                    name: file.name,
+                    data: reader.result.split(',')[1],
+                    contentType: file.type
+                });
+                reader.onerror = () => reject('File read failed');
                 reader.readAsDataURL(file);
             });
         }
 
-        // ===== UI Helpers =====
-        function copyAccountNumber() {
-            const accountNumber = document.getElementById('accountNumber').textContent;
-            navigator.clipboard.writeText(accountNumber)
-                .then(() => alert('Account number copied to clipboard!'))
-                .catch(() => alert('Failed to copy! Please select the text manually.'));
+        function handleNetworkError(error, retryCallback) {
+            let message = error.message;
+            if (error.name === 'AbortError') {
+                message = 'Request timed out. Check your internet connection';
+            }
+            if (message.includes('Failed to fetch')) {
+                message = 'Network error. Check internet connection';
+            }
+            
+            showError(`${message}. <button onclick="window.location.reload()">Try Again</button>`);
         }
 
         function showLoading(message) {
@@ -282,10 +298,12 @@ Receipt: {url}`
         }
 
         function showError(message) {
-            const errorDiv = document.createElement('div');
-            errorDiv.className = 'error-message';
-            errorDiv.textContent = message;
-            document.getElementById('content').appendChild(errorDiv);
+            const content = document.getElementById('content');
+            content.innerHTML = `
+                <div class="error-message">
+                    <p>${message}</p>
+                </div>
+            `;
         }
 
         function showConfirmation(data) {
@@ -307,6 +325,12 @@ Receipt: {url}`
                     </button>
                 </div>
             `;
+        }
+
+        function copyAccountNumber() {
+            navigator.clipboard.writeText('00010010016466')
+                .then(() => alert('Account number copied!'))
+                .catch(() => alert('Copy failed. Please select the text manually.'));
         }
     </script>
 </body>
