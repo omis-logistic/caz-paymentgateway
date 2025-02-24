@@ -137,51 +137,32 @@ Receipt: {url}`,
         };
 
         // ===== Initialization =====
-        document.addEventListener('DOMContentLoaded', async () => {
-            try {
-                const orderNumber = getOrderNumberFromURL();
-                if (!orderNumber) return;
-                
-                const orderData = await fetchOrderDetails(orderNumber);
-                renderPaymentForm(orderNumber, orderData);
-            } catch (error) {
-                showError(error.message);
-            }
-        });
-
-        // ===== Core Functions =====
-        function getOrderNumberFromURL() {
+        (function init() {
             const urlParams = new URLSearchParams(window.location.search);
             const orderNumber = urlParams.get('orderNumber');
             
-            if (!orderNumber || orderNumber.trim().length < 5) {
-                showError('Valid order number is required in URL');
-                return null;
+            if (!orderNumber) {
+                showError('Order number is required in URL parameters');
+                return;
             }
-            return orderNumber.trim();
-        }
+            
+            // Explicitly store order number
+            sessionStorage.setItem('currentOrderNumber', orderNumber);
+            
+            loadOrderDetails(orderNumber);
+        })();
 
-        async function fetchOrderDetails(orderNumber) {
+        async function loadOrderDetails(orderNumber) {
             try {
-                const response = await fetchWithTimeout(
-                    `${CONFIG.scriptUrl}?orderNumber=${encodeURIComponent(orderNumber)}`,
-                    { timeout: 15000 }
-                );
-
-                const data = await parseJSONResponse(response);
-                
-                if (!data.success) {
-                    throw new Error(data.error || 'Failed to load order details');
-                }
-
-                return data.data;
+                const response = await fetch(${CONFIG.scriptUrl}?orderNumber=${encodeURIComponent(orderNumber)});
+                // ... rest of your existing code ...
             } catch (error) {
-                throw new Error(`Failed to fetch order: ${error.message}`);
+                showError(error.message);
             }
         }
 
-        function renderPaymentForm(orderNumber, orderData) {
-            const template = `
+        function renderPaymentForm(orderData) {
+            const content = `
                 <div class="form-group">
                     <p><strong>Order Number:</strong> ${orderNumber}</p>
                     <p><strong>Code:</strong> ${orderData.code}</p>
@@ -201,11 +182,12 @@ Receipt: {url}`,
                 </div>
 
                 <form id="paymentForm">
-                    <input type="hidden" name="orderNumber" value="${orderNumber}">
-                    <input type="hidden" name="code" value="${orderData.code}">
-                    <input type="hidden" name="name" value="${orderData.name}">
-                    <input type="hidden" name="price" value="${orderData.price}">
-                    <input type="hidden" name="branchPhone" value="${orderData.branchPhone}">
+                    <!-- Remove inline value bindings -->
+                    <input type="hidden" name="orderNumber" id="formOrderNumber">
+                    <input type="hidden" name="code" id="formCode">
+                    <input type="hidden" name="name" id="formName">
+                    <input type="hidden" name="price" id="formPrice">
+                    <input type="hidden" name="branchPhone" id="formBranchPhone">
 
                     <div class="form-group">
                         <label>Upload Payment Receipt (PNG/JPG, max 5MB):</label>
@@ -216,7 +198,12 @@ Receipt: {url}`,
                 </form>
             `;
 
-            document.getElementById('content').innerHTML = template;
+            document.getElementById('formOrderNumber').value = sessionStorage.getItem('currentOrderNumber');
+            document.getElementById('formCode').value = orderData.code;
+            document.getElementById('formName').value = orderData.name;
+            document.getElementById('formPrice').value = orderData.price;
+            document.getElementById('formBranchPhone').value = orderData.branchPhone;
+
             setupFormSubmission();
         }
 
