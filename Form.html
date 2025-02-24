@@ -1,305 +1,313 @@
 <!DOCTYPE html>
-<html> 
-  <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, shrink-to-fit=no">
-    <title>Payment Gateway</title>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CAZ Payment Gateway</title>
     <style>
-      /* ===== BANNER REMOVAL ===== */
-      /* No banner will appear since this is a standalone HTML file */
+        /* === Base Styles === */
+        :root {
+            --gold: #D4AF37;
+            --error-red: #dc3545;
+            --success-green: #28a745;
+            --background: #f8f9fa;
+        }
 
-      /* ===== ORIGINAL STYLES ===== */
-      :root {
-        --gold: #D4AF37;
-        --white: #FFFFFF;
-        --text-dark: #333333;
-      }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Arial', sans-serif;
+        }
 
-      * {
-        box-sizing: border-box;
-        -webkit-text-size-adjust: none;
-        -webkit-overflow-scrolling: touch;
-      }
-
-      body {
-        font-family: Arial, sans-serif;
-        margin: 0;
-        padding: 0;
-        width: 100vw;
-        background: var(--white);
-        color: var(--text-dark);
-        font-size: 14px;
-        line-height: 1.4;
-        display: flex;
-        flex-direction: column;
-        min-height: 100vh;
-      }
-
-      .container {
-        width: 100%;
-        max-width: 100%;
-        margin: 0 auto;
-        flex: 1;
-      }
-
-      .header {
-        background: var(--gold);
-        padding: 15px;
-        text-align: center;
-        position: sticky;
-        top: 0;
-        width: 100%;
-      }
-
-      .content {
-        padding: 15px;
-        width: 100%;
-      }
-
-      .account-row {
-        display: block;
-        width: 100%;
-      }
-
-      #accNum {
-        display: block;
-        width: 100%;
-        font-size: 16px;
-        word-break: break-word;
-        text-align: center;
-        margin: 10px 0;
-        padding: 12px;
-        background: #FFFBE6;
-        border: 1px solid var(--gold);
-        border-radius: 4px;
-      }
-
-      .copy-btn, input[type="submit"] {
-        display: block;
-        width: 100%;
-        background: var(--gold);
-        color: white;
-        border: none;
-        padding: 12px;
-        border-radius: 4px;
-        margin: 10px 0;
-        font-size: 16px;
-      }
-
-      input[type="file"] {
-        display: block;
-        width: 100%;
-        padding: 12px;
-        margin: 15px 0;
-        border: 2px dashed var(--gold);
-        background: #FFFBE6;
-        border-radius: 4px;
-      }
-
-      @media (min-width: 768px) {
         body {
-          padding: 20px;
-          background: #f0f0f0;
-          font-size: 16px;
+            background: var(--background);
+            color: #333;
+            line-height: 1.6;
         }
 
         .container {
-          width: 600px;
-          border-radius: 10px;
-          box-shadow: 0 2px 15px rgba(0,0,0,0.1);
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 15px rgba(0,0,0,0.1);
         }
 
-        .account-row {
-          display: flex;
-          gap: 15px;
-          align-items: center;
+        .header {
+            background: var(--gold);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 25px;
+            text-align: center;
         }
 
-        #accNum {
-          text-align: left;
-          margin: 0;
+        /* === Form Elements === */
+        .form-group {
+            margin-bottom: 20px;
         }
 
-        .copy-btn {
-          width: auto;
-          min-width: 160px;
+        input[type="file"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px dashed var(--gold);
+            border-radius: 5px;
+            margin: 15px 0;
         }
-      }
+
+        button, .btn {
+            background: var(--gold);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 5px;
+            cursor: pointer;
+            width: 100%;
+            font-size: 16px;
+            transition: opacity 0.3s;
+        }
+
+        button:hover {
+            opacity: 0.9;
+        }
+
+        /* === Status Messages === */
+        .loading {
+            text-align: center;
+            padding: 20px;
+            font-size: 1.2em;
+            color: var(--gold);
+        }
+
+        .error-message {
+            color: var(--error-red);
+            padding: 15px;
+            margin: 20px 0;
+            border: 1px solid var(--error-red);
+            border-radius: 5px;
+            background: #fff5f5;
+        }
+
+        .success-message {
+            color: var(--success-green);
+            padding: 15px;
+            margin: 20px 0;
+            border: 1px solid var(--success-green);
+            border-radius: 5px;
+            background: #f0fff4;
+        }
     </style>
-  </head>
-  <body>
+</head>
+<body>
     <div class="container">
-      <div class="header">
-        <h1>Payment Gateway</h1>
-      </div>
-      
-      <div class="content">
-        <p><strong>Order Number:</strong> <span id="orderNumber"></span></p>
-        <p><strong>Code:</strong> <span id="code"></span></p>
-        <p><strong>Name:</strong> <span id="name"></span></p>
-        <p><strong>Price:</strong> $<span id="price"></span></p>
-        
-        <hr>
-        
-        <h3>Payment Instructions</h3>
-        <p style="color: var(--gold); font-weight: bold;">BIBD Transfer</p>
-        <div class="account-row">
-          <span id="accNum">00010010016466</span>
-          <button class="copy-btn" onclick="copyToClipboard()">Copy Account Number</button>
+        <div class="header">
+            <h1>CAZ Payment Gateway</h1>
         </div>
-        
-        <form id="paymentForm">
-          <input type="hidden" id="hiddenOrderNumber" name="orderNumber">
-          <input type="hidden" id="hiddenCode" name="code">
-          <input type="hidden" id="hiddenName" name="name">
-          <input type="hidden" id="hiddenPrice" name="price">
-          <input type="hidden" id="hiddenBranchPhone" name="branchPhone">
-          
-          <p>Upload payment screenshot:</p>
-          <input type="file" name="uploadFile" accept="image/*" required>
-          <input type="submit" value="Submit Payment">
-        </form>
-      </div>
+
+        <div id="content">
+            <!-- Content populated by JavaScript -->
+            <div class="loading">Loading order details...</div>
+        </div>
     </div>
 
     <script>
-      // ===== FETCH ORDER DATA =====
-      const urlParams = new URLSearchParams(window.location.search);
-      const orderNumber = urlParams.get('orderNumber');
+        // ===== Configuration =====
+        const CONFIG = {
+            scriptUrl: "https://script.google.com/macros/s/AKfycbwDxEfFwuREacfQEqY7y2h1JGGvlWtQJzoVlY8hYgisjAPcRHVg72z3Blxe1d0yxSi_/exec",  // Replace with your deployed script URL
+            whatsappFormat: `Payment Confirmation
+Order Number: {orderNumber}
+Code: {code}
+Name: {name}
+Price: ${"$"}{price}
+Receipt: {url}`
+        };
 
-      if (!orderNumber) {
-        alert("Order number is required!");
-      } else {
-        // Replace with your Google Apps Script web app URL
-        const scriptUrl = "https://script.google.com/macros/s/AKfycbwDxEfFwuREacfQEqY7y2h1JGGvlWtQJzoVlY8hYgisjAPcRHVg72z3Blxe1d0yxSi_/exec";
+        // ===== Initialization =====
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                const urlParams = new URLSearchParams(window.location.search);
+                const orderNumber = urlParams.get('orderNumber');
 
-        // Show loading state
-        document.getElementById('orderNumber').textContent = "Loading...";
-        document.getElementById('code').textContent = "Loading...";
-        document.getElementById('name').textContent = "Loading...";
-        document.getElementById('price').textContent = "Loading...";
+                if (!orderNumber) {
+                    showError('Order number is required in URL parameters');
+                    return;
+                }
 
-// Replace the fetch block with:
-fetch(`${scriptUrl}?orderNumber=${orderNumber}`)
-  .then(response => {
-    if (!response.ok) throw new Error('Network error');
-    return response.json();
-  })
-  .then(data => {
-    if (!data.success) {
-      throw new Error(data.error || 'Unknown error');
-    }
-    
-    document.getElementById('orderNumber').textContent = orderNumber;
-    document.getElementById('code').textContent = data.data.code;
-    document.getElementById('name').textContent = data.data.name;
-    document.getElementById('price').textContent = data.data.price;
-
-    document.getElementById('hiddenOrderNumber').value = orderNumber;
-    document.getElementById('hiddenCode').value = data.data.code;
-    document.getElementById('hiddenName').value = data.data.name;
-    document.getElementById('hiddenPrice').value = data.data.price;
-    document.getElementById('hiddenBranchPhone').value = data.data.branchPhone;
-  })
-  .catch(error => {
-    alert("Error: " + error.message);
-    window.location.href = `https://omis-logistic.github.io/caz-paymentgateway/Form.html?orderNumber=${orderNumber}`;
-  });
-      }
-
-      // ===== SUBMIT FORM DATA =====
-      document.getElementById('paymentForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const file = e.target.uploadFile.files[0];
-        
-        if (!file) {
-          alert('Please select a payment screenshot first!');
-          return;
-        }
-
-        const originalContent = document.body.innerHTML;
-        document.body.innerHTML = `
-          <div class="container">
-            <div class="header">
-              <h1>Processing Payment</h1>
-            </div>
-            <div class="content">
-              <p>Please wait while we process your payment...</p>
-            </div>
-          </div>
-        `;
-
-        try {
-          const fileData = await new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result.split(',')[1]);
-            reader.onerror = () => reject("Failed to read file");
-            reader.readAsDataURL(file);
-          });
-
-          const response = await fetch("YOUR_GOOGLE_SCRIPT_URL", {
-            method: "POST",
-            body: JSON.stringify({
-              upload: {
-                name: file.name,
-                data: fileData,
-                contentType: file.type
-              },
-              orderNumber: document.getElementById('hiddenOrderNumber').value,
-              code: document.getElementById('hiddenCode').value,
-              name: document.getElementById('hiddenName').value,
-              price: document.getElementById('hiddenPrice').value,
-              branchPhone: document.getElementById('hiddenBranchPhone').value
-            }),
-            headers: {
-              "Content-Type": "application/json"
+                const orderData = await fetchOrderDetails(orderNumber);
+                renderPaymentForm(orderNumber, orderData);
+            } catch (error) {
+                showError(error.message);
             }
-          });
+        });
 
-          const data = await response.json();
-          if (data.success) {
-            const message = `Payment Confirmation
-Order Number: ${data.orderNumber}
-Code: ${data.code}
-Name: ${data.name}
-Price: $${data.price}
-Screenshot: ${data.url}`;
+        // ===== Core Functions =====
+        async function fetchOrderDetails(orderNumber) {
+            try {
+                const response = await fetch(`${CONFIG.scriptUrl}?orderNumber=${encodeURIComponent(orderNumber)}`);
+                
+                if (!response.ok) {
+                    throw new Error(`Server error: ${response.status}`);
+                }
 
-            document.body.innerHTML = `
-            <div class="container">
-              <div class="header">
-                <h1>Payment Confirmed</h1>
-              </div>
-              <div class="content">
-                <p><strong>Order Number:</strong> ${data.orderNumber}</p>
-                <p><strong>Code:</strong> ${data.code}</p>
-                <p><strong>Name:</strong> ${data.name}</p>
-                <p><strong>Price:</strong> $${data.price}</p>
-                <p><strong>Screenshot:</strong> <a href="${data.url}" target="_blank">View Receipt</a></p>
-                <button onclick="window.open('https://wa.me/${data.branchPhone}?text=${encodeURIComponent(message)}', '_blank')" 
-                  class="copy-btn">
-                  Send via WhatsApp
-                </button>
-              </div>
-            </div>
+                const data = await response.json();
+
+                if (!data.success) {
+                    throw new Error(data.error || 'Failed to load order details');
+                }
+
+                return data.data;
+            } catch (error) {
+                throw new Error(`Failed to fetch order details: ${error.message}`);
+            }
+        }
+
+        function renderPaymentForm(orderNumber, orderData) {
+            const content = `
+                <div class="form-group">
+                    <p><strong>Order Number:</strong> ${orderNumber}</p>
+                    <p><strong>Code:</strong> ${orderData.code}</p>
+                    <p><strong>Name:</strong> ${orderData.name}</p>
+                    <p><strong>Amount:</strong> ${"$"}${orderData.price}</p>
+                </div>
+
+                <hr>
+
+                <div class="payment-instructions">
+                    <h3>Payment Instructions</h3>
+                    <div class="account-info">
+                        <p>BIBD Account Number:</p>
+                        <p id="accountNumber">00010010016466</p>
+                        <button onclick="copyAccountNumber()">Copy Account Number</button>
+                    </div>
+                </div>
+
+                <form id="paymentForm">
+                    <input type="hidden" name="orderNumber" value="${orderNumber}">
+                    <input type="hidden" name="code" value="${orderData.code}">
+                    <input type="hidden" name="name" value="${orderData.name}">
+                    <input type="hidden" name="price" value="${orderData.price}">
+                    <input type="hidden" name="branchPhone" value="${orderData.branchPhone}">
+
+                    <div class="form-group">
+                        <label>Upload Payment Receipt (Image Only):</label>
+                        <input type="file" name="receipt" accept="image/*" required>
+                    </div>
+
+                    <button type="submit">Submit Payment</button>
+                </form>
             `;
-          } else {
-            throw new Error(data.error);
-          }
-        } catch (error) {
-          alert("Error: " + error.message);
-          document.body.innerHTML = originalContent;
-        }
-      });
 
-      // ===== COPY TO CLIPBOARD =====
-      async function copyToClipboard() {
-        try {
-          await navigator.clipboard.writeText(document.getElementById('accNum').innerText);
-          alert('Account number copied to clipboard!');
-        } catch (err) {
-          alert('Failed to copy! Please manually select the text.');
+            document.getElementById('content').innerHTML = content;
+            setupFormSubmission();
         }
-      }
+
+        // ===== Form Handling =====
+        function setupFormSubmission() {
+            document.getElementById('paymentForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                
+                try {
+                    const formData = new FormData(e.target);
+                    const fileInput = formData.get('receipt');
+                    
+                    if (!fileInput) {
+                        throw new Error('Please select a payment receipt');
+                    }
+
+                    showLoading('Processing payment...');
+                    
+                    const result = await submitPayment(formData);
+                    showConfirmation(result);
+                } catch (error) {
+                    showError(error.message);
+                }
+            });
+        }
+
+        async function submitPayment(formData) {
+            const file = formData.get('receipt');
+            const reader = new FileReader();
+
+            return new Promise((resolve, reject) => {
+                reader.onload = async () => {
+                    try {
+                        const response = await fetch(CONFIG.scriptUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                upload: {
+                                    name: file.name,
+                                    data: reader.result.split(',')[1],
+                                    contentType: file.type
+                                },
+                                orderNumber: formData.get('orderNumber'),
+                                code: formData.get('code'),
+                                name: formData.get('name'),
+                                price: formData.get('price'),
+                                branchPhone: formData.get('branchPhone')
+                            })
+                        });
+
+                        const data = await response.json();
+                        
+                        if (!data.success) {
+                            throw new Error(data.error || 'Payment submission failed');
+                        }
+
+                        resolve(data.data);
+                    } catch (error) {
+                        reject(error);
+                    }
+                };
+                reader.onerror = () => reject('Error reading file');
+                reader.readAsDataURL(file);
+            });
+        }
+
+        // ===== UI Helpers =====
+        function copyAccountNumber() {
+            const accountNumber = document.getElementById('accountNumber').textContent;
+            navigator.clipboard.writeText(accountNumber)
+                .then(() => alert('Account number copied to clipboard!'))
+                .catch(() => alert('Failed to copy! Please select the text manually.'));
+        }
+
+        function showLoading(message) {
+            document.getElementById('content').innerHTML = `
+                <div class="loading">
+                    <p>${message}</p>
+                </div>
+            `;
+        }
+
+        function showError(message) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error-message';
+            errorDiv.textContent = message;
+            document.getElementById('content').appendChild(errorDiv);
+        }
+
+        function showConfirmation(data) {
+            const message = CONFIG.whatsappFormat
+                .replace('{orderNumber}', data.orderNumber)
+                .replace('{code}', data.code)
+                .replace('{name}', data.name)
+                .replace('{price}', data.price)
+                .replace('{url}', data.url);
+
+            document.getElementById('content').innerHTML = `
+                <div class="success-message">
+                    <h2>Payment Confirmed!</h2>
+                    <p>Order Number: ${data.orderNumber}</p>
+                    <p>Amount Paid: ${"$"}${data.price}</p>
+                    <p>Receipt: <a href="${data.url}" target="_blank">View Receipt</a></p>
+                    <button onclick="window.open('https://wa.me/${data.branchPhone}?text=${encodeURIComponent(message)}', '_blank')">
+                        Send WhatsApp Confirmation
+                    </button>
+                </div>
+            `;
+        }
     </script>
-  </body>
+</body>
 </html>
