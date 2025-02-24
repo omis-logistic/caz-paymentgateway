@@ -81,6 +81,12 @@
             font-size: 16px;
             cursor: pointer;
             margin: 5px 0;
+            transition: opacity 0.3s;
+        }
+
+        button:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
         }
 
         .loading {
@@ -106,6 +112,11 @@
             text-align: center;
             margin: 20px 0;
         }
+
+        .retry-button {
+            background: var(--error-red);
+            margin-top: 10px;
+        }
     </style>
 </head>
 <body>
@@ -121,47 +132,73 @@
     <script>
         // ===== Configuration =====
         const CONFIG = {
-            scriptUrl: "https://script.google.com/macros/s/AKfycbwDxEfFwuREacfQEqY7y2h1JGGvlWtQJzoVlY8hYgisjAPcRHVg72z3Blxe1d0yxSi_/exec", // Replace with your actual GAS URL
-            accountNumber: "00010010016466"
+            scriptUrl: "https://script.google.com/macros/s/AKfycbwDxEfFwuREacfQEqY7y2h1JGGvlWtQJzoVlY8hYgisjAPcRHVg72z3Blxe1d0yxSi_/exec", // Replace with your GAS URL
+            accountNumber: "00010010016466",
+            maxRetries: 3,
+            retryDelay: 2000
         };
 
-        // ===== Initialize Application =====
+        // ===== Application Initialization =====
         (async function init() {
             try {
                 const urlParams = new URLSearchParams(window.location.search);
-                const orderNumber = urlParams.get('orderNumber');
+                let orderNumber = urlParams.get('orderNumber');
                 
-                if (!orderNumber || orderNumber.length < 3) {
-                    throw new Error("Invalid or missing order number");
+                if (!orderNumber) {
+                    throw new Error("Order number is required in URL parameters");
                 }
 
-                const orderData = await fetchOrderDetails(orderNumber);
-                renderPaymentForm(orderNumber, orderData);
-                setupFormHandlers(orderNumber, orderData);
+                // Normalize order number
+                orderNumber = orderNumber
+                    .trim()
+                    .toUpperCase()
+                    .replace(/[^A-Z0-9]/g, '');
+
+                if (orderNumber.length < 3) {
+                    throw new Error("Invalid order number format");
+                }
+
+                await loadOrderDetails(orderNumber);
 
             } catch (error) {
-                showError(error.message);
+                showError(error.message, orderNumber);
             }
         })();
 
         // ===== Core Functions =====
-        async function fetchOrderDetails(orderNumber) {
+        async function loadOrderDetails(orderNumber, retryCount = 0) {
             try {
+                showLoading("Fetching order details...");
+                
                 const response = await fetch(
-                    `${CONFIG.scriptUrl}?orderNumber=${encodeURIComponent(orderNumber)}`
+                    `${CONFIG.scriptUrl}?orderNumber=${encodeURIComponent(orderNumber)}&t=${Date.now()}`,
+                    {
+                        headers: {
+                            'Cache-Control': 'no-cache'
+                        }
+                    }
                 );
-                
-                const data = await response.json();
-                
-                if (!data.success) {
-                    throw new Error(data.error || "Order not found");
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
                 }
 
-                return data.data;
+                const data = await response.json();
+
+                if (!data.success) {
+                    throw new Error(data.error || "Order details not found");
+                }
+
+                renderPaymentForm(orderNumber, data.data);
+                setupFormHandlers(orderNumber, data.data);
 
             } catch (error) {
-                console.error("Fetch Error:", error);
-                throw new Error("Failed to load order details. Please check the order number.");
+                if (retryCount < CONFIG.maxRetries) {
+                    console.log(`Retrying... (${retryCount + 1}/${CONFIG.maxRetries})`);
+                    await new Promise(resolve => setTimeout(resolve, CONFIG.retryDelay));
+                    return loadOrderDetails(orderNumber, retryCount + 1);
+                }
+                throw new Error(`Failed to load order details after ${CONFIG.maxRetries} attempts: ${error.message}`);
             }
         }
 
@@ -169,15 +206,15 @@
             const template = `
                 <div class="order-info">
                     <p><strong>Order Number:</strong> ${orderNumber}</p>
-                    <p><strong>Code:</strong> ${orderData.code}</p>
-                    <p><strong>Name:</strong> ${orderData.name}</p>
-                    <p><strong>Amount:</strong> $${orderData.price}</p>
+                    <p><strong>Code:</strong> ${orderData.code || 'N/A'}</p>
+                    <p><strong>Name:</strong> ${orderData.name || 'N/A'}</p>
+                    <p><strong>Amount:</strong> $${orderData.price || '0.00'}</p>
                 </div>
 
                 <div class="payment-instructions">
                     <h3>Payment Instructions</h3>
                     <p>Transfer to BIBD Account:</p>
-                    <p id="accountNumber">${CONFIG.accountNumber}</p>
+                    <div id="accountNumber">${CONFIG.accountNumber}</div>
                     <button onclick="copyAccountNumber()">Copy Account Number</button>
                 </div>
 
@@ -187,22 +224,29 @@
                     <input type="hidden" name="name" value="${orderData.name}">
                     <input type="hidden" name="price" value="${orderData.price}">
 
-                    <label>Upload Payment Receipt (PNG/JPG):</label>
-                    <input type="file" name="receipt" accept="image/*" required>
-                    
-                    <button type="submit">Submit Payment</button>
+                    <label>Upload Payment Receipt (PNG/JPG, max 5MB):</label>
+                    <input type="file" 
+                           name="receipt" 
+                           accept="image/png, image/jpeg" 
+                           required
+                           onchange="validateFile(this)">
+
+                    <button type="submit" id="submitButton">Submit Payment</button>
                 </form>
             `;
 
             document.getElementById('content').innerHTML = template;
         }
 
+        // ===== Event Handlers =====
         function setupFormHandlers(orderNumber, orderData) {
             document.getElementById('paymentForm').addEventListener('submit', async (e) => {
                 e.preventDefault();
-                const file = e.target.receipt.files[0];
+                const submitButton = document.getElementById('submitButton');
+                submitButton.disabled = true;
                 
                 try {
+                    const file = e.target.receipt.files[0];
                     if (!file) throw new Error("Please select a payment receipt");
                     
                     showLoading("Processing payment...");
@@ -210,7 +254,9 @@
                     showConfirmation(orderNumber);
                     
                 } catch (error) {
-                    showError(error.message);
+                    showError(error.message, orderNumber);
+                } finally {
+                    submitButton.disabled = false;
                 }
             });
         }
@@ -230,10 +276,13 @@
                     body: formData
                 });
 
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
                 const data = await response.json();
-                
                 if (!data.success) {
-                    throw new Error(data.error || "Payment submission failed");
+                    throw new Error(data.error || "Payment verification failed");
                 }
 
                 return data;
@@ -244,23 +293,47 @@
             }
         }
 
+        function validateFile(input) {
+            const maxSize = 5 * 1024 * 1024; // 5MB
+            if (input.files[0].size > maxSize) {
+                alert("File size exceeds 5MB limit");
+                input.value = '';
+            }
+        }
+
         function copyAccountNumber() {
             navigator.clipboard.writeText(CONFIG.accountNumber)
                 .then(() => alert("Account number copied!"))
-                .catch(() => alert("Copy failed - please select text manually"));
+                .catch(() => {
+                    const accountDiv = document.getElementById('accountNumber');
+                    const range = document.createRange();
+                    range.selectNode(accountDiv);
+                    window.getSelection().removeAllRanges();
+                    window.getSelection().addRange(range);
+                    document.execCommand('copy');
+                    alert("Copied to clipboard!");
+                });
         }
 
+        // ===== UI Functions =====
         function showLoading(message) {
             document.getElementById('content').innerHTML = `
                 <div class="loading">${message}</div>
             `;
         }
 
-        function showError(message) {
+        function showError(message, orderNumber) {
             document.getElementById('content').innerHTML = `
                 <div class="error-message">
+                    <h3>Error Processing Request</h3>
                     <p>${message}</p>
-                    <button onclick="location.reload()">Try Again</button>
+                    ${orderNumber ? `
+                    <p>Order Number: ${orderNumber}</p>
+                    <button onclick="location.reload()">Refresh Page</button>
+                    <button class="retry-button" onclick="loadOrderDetails('${orderNumber}')">
+                        Retry Loading
+                    </button>
+                    ` : ''}
                 </div>
             `;
         }
@@ -271,6 +344,7 @@
                     <h2>Payment Received!</h2>
                     <p>Order Number: ${orderNumber}</p>
                     <p>Thank you for your payment. We will process your order shortly.</p>
+                    <button onclick="location.reload()">Submit Another Payment</button>
                 </div>
             `;
         }
