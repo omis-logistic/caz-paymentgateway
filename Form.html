@@ -118,19 +118,19 @@
         </div>
 
         <div id="content">
-            <div class="loading">Loading order details...</div>
+            <div class="loading">Initializing payment gateway...</div>
         </div>
     </div>
 
     <script>
         // ===== Configuration =====
         const CONFIG = {
-            scriptUrl: "https://script.google.com/macros/s/AKfycbwDxEfFwuREacfQEqY7y2h1JGGvlWtQJzoVlY8hYgisjAPcRHVg72z3Blxe1d0yxSi_/exec", // REPLACE THIS
+            scriptUrl: "https://script.google.com/macros/s/AKfycbwDxEfFwuREacfQEqY7y2h1JGGvlWtQJzoVlY8hYgisjAPcRHVg72z3Blxe1d0yxSi_/exec", // REPLACE WITH ACTUAL URL
             accountNumber: "00010010016466",
             maxFileSizeMB: 5,
-            timeoutSeconds: 30,
+            timeoutSeconds: 20,
             whatsappTemplate: `Payment Confirmation
-Order: {orderNumber}
+Order Number: {orderNumber}
 Code: {code}
 Name: {name}
 Amount: ${"$"}{price}
@@ -143,57 +143,70 @@ Receipt: {url}`
                 const urlParams = new URLSearchParams(window.location.search);
                 const orderNumber = urlParams.get('orderNumber');
                 
-                if (!validateOrderNumber(orderNumber)) {
-                    showError("Invalid order number in URL");
+                // Validate order number format
+                if (!orderNumber || !/^[a-zA-Z0-9]{8,}$/.test(orderNumber)) {
+                    showError("Invalid order number format");
                     return;
                 }
 
+                // Store order number for later use
+                sessionStorage.setItem('currentOrder', orderNumber);
+                
+                // Load order details
                 const orderData = await loadOrderDetails(orderNumber);
-                renderPaymentForm(orderNumber, orderData);
-                setupFormSubmission(orderNumber, orderData);
+                renderPaymentForm(orderData);
+                setupFormSubmission();
+
             } catch (error) {
-                showError(error.message);
+                showError(`Initialization failed: ${error.message}`);
             }
         })();
 
         // ===== Core Functions =====
         async function loadOrderDetails(orderNumber) {
-            try {
-                const controller = new AbortController();
-                const timeout = setTimeout(
-                    () => controller.abort(), 
-                    CONFIG.timeoutSeconds * 1000
-                );
+            const controller = new AbortController();
+            const timeout = setTimeout(
+                () => controller.abort(),
+                CONFIG.timeoutSeconds * 1000
+            );
 
+            try {
                 const response = await fetch(
                     `${CONFIG.scriptUrl}?orderNumber=${encodeURIComponent(orderNumber)}`,
-                    { signal: controller.signal }
+                    { 
+                        signal: controller.signal,
+                        mode: 'cors'
+                    }
                 );
-                
+
                 clearTimeout(timeout);
 
                 if (!response.ok) {
-                    throw new Error(`Server error: ${response.status}`);
+                    const errorText = await response.text();
+                    throw new Error(`Server response: ${errorText}`);
                 }
 
                 const data = await response.json();
                 
                 if (!data.success) {
-                    throw new Error(data.error || "Failed to load order details");
+                    throw new Error(data.error || "Order data not found");
                 }
 
                 return data.data;
+
             } catch (error) {
                 if (error.name === 'AbortError') {
-                    throw new Error("Request timed out. Please check your connection");
+                    throw new Error("Connection timeout - check internet");
                 }
                 throw new Error(`Failed to load order: ${error.message}`);
             }
         }
 
-        function renderPaymentForm(orderNumber, orderData) {
-            const template = `
-                <div class="form-group">
+        function renderPaymentForm(orderData) {
+            const orderNumber = sessionStorage.getItem('currentOrder');
+            
+            document.getElementById('content').innerHTML = `
+                <div class="order-details">
                     <p><strong>Order Number:</strong> ${orderNumber}</p>
                     <p><strong>Code:</strong> ${orderData.code}</p>
                     <p><strong>Name:</strong> ${orderData.name}</p>
@@ -226,44 +239,43 @@ Receipt: {url}`
                     <button type="submit">Submit Payment</button>
                 </form>
             `;
-
-            document.getElementById('content').innerHTML = template;
         }
 
-        function setupFormSubmission(orderNumber, orderData) {
+        function setupFormSubmission() {
             document.getElementById('paymentForm').addEventListener('submit', async (e) => {
                 e.preventDefault();
-                
+                const formData = new FormData(e.target);
+                const file = formData.get('receipt');
+
                 try {
-                    const file = e.target.receipt.files[0];
                     validateFile(file);
-                    
                     showLoading("Processing payment...");
-                    const result = await submitPayment(orderNumber, orderData, file);
+                    
+                    const result = await processPayment(formData, file);
                     showConfirmation(result);
                 } catch (error) {
-                    showError(error.message);
+                    showError(`Payment failed: ${error.message}`);
                 }
             });
         }
 
-        async function submitPayment(orderNumber, orderData, file) {
+        async function processPayment(formData, file) {
+            const controller = new AbortController();
+            const timeout = setTimeout(
+                () => controller.abort(),
+                CONFIG.timeoutSeconds * 1000
+            );
+
             try {
                 const fileData = await readFile(file);
                 const payload = {
-                    orderNumber: orderNumber,
-                    code: orderData.code,
-                    name: orderData.name,
-                    price: orderData.price,
-                    branchPhone: orderData.branchPhone,
+                    orderNumber: formData.get('orderNumber'),
+                    code: formData.get('code'),
+                    name: formData.get('name'),
+                    price: formData.get('price'),
+                    branchPhone: formData.get('branchPhone'),
                     upload: fileData
                 };
-
-                const controller = new AbortController();
-                const timeout = setTimeout(
-                    () => controller.abort(), 
-                    CONFIG.timeoutSeconds * 1000
-                );
 
                 const response = await fetch(CONFIG.scriptUrl, {
                     method: 'POST',
@@ -276,7 +288,7 @@ Receipt: {url}`
 
                 if (!response.ok) {
                     const errorText = await response.text();
-                    throw new Error(`Payment failed: ${errorText.slice(0, 100)}`);
+                    throw new Error(`Server response: ${errorText}`);
                 }
 
                 const data = await response.json();
@@ -286,30 +298,27 @@ Receipt: {url}`
                 }
 
                 return data.data;
+
             } catch (error) {
                 if (error.name === 'AbortError') {
                     throw new Error("Payment submission timed out");
                 }
-                throw new Error(`Payment failed: ${error.message}`);
+                throw error;
             }
         }
 
         // ===== Helper Functions =====
-        function validateOrderNumber(orderNumber) {
-            return orderNumber && orderNumber.trim().length >= 3;
-        }
-
         function validateFile(file) {
-            if (!file) throw new Error("Please select a payment receipt");
+            if (!file) throw new Error("No file selected");
             if (file.size > CONFIG.maxFileSizeMB * 1024 * 1024) {
-                throw new Error(`File size exceeds ${CONFIG.maxFileSizeMB}MB limit`);
+                throw new Error(`File exceeds ${CONFIG.maxFileSizeMB}MB limit`);
             }
             if (!['image/png', 'image/jpeg'].includes(file.type)) {
-                throw new Error("Only PNG and JPG files allowed");
+                throw new Error("Only PNG/JPG files allowed");
             }
         }
 
-        function readFile(file) {
+        async function readFile(file) {
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
                 reader.onload = () => resolve({
@@ -325,7 +334,7 @@ Receipt: {url}`
         // ===== UI Functions =====
         function copyAccountNumber() {
             navigator.clipboard.writeText(CONFIG.accountNumber)
-                .then(() => alert("Account number copied!"))
+                .then(() => alert("Account number copied to clipboard!"))
                 .catch(() => alert("Copy failed - please select text manually"));
         }
 
@@ -341,7 +350,7 @@ Receipt: {url}`
             document.getElementById('content').innerHTML = `
                 <div class="error-message">
                     <p>${message}</p>
-                    <button onclick="location.reload()" style="margin-top: 10px;">
+                    <button onclick="location.reload()" class="retry-btn">
                         Try Again
                     </button>
                 </div>
@@ -358,15 +367,19 @@ Receipt: {url}`
 
             document.getElementById('content').innerHTML = `
                 <div class="success-message">
-                    <h2>Payment Successful!</h2>
+                    <h2>Payment Successful! 🎉</h2>
                     <p><strong>Order Number:</strong> ${data.orderNumber}</p>
                     <p><strong>Amount Paid:</strong> ${"$"}${data.price}</p>
-                    <p><strong>Receipt:</strong> <a href="${data.url}" target="_blank">View</a></p>
-                    <button onclick="window.open('https://wa.me/${data.branchPhone}?text=${encodeURIComponent(message)}', '_blank')">
-                        Send WhatsApp Confirmation
+                    <p><strong>Receipt:</strong> <a href="${data.url}" target="_blank">View Here</a></p>
+                    <button onclick="sendWhatsApp('${data.branchPhone}', '${encodeURIComponent(message)}')">
+                        Confirm via WhatsApp
                     </button>
                 </div>
             `;
+        }
+
+        function sendWhatsApp(phone, message) {
+            window.open(`https://wa.me/${phone}?text=${message}`, '_blank');
         }
     </script>
 </body>
