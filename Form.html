@@ -191,16 +191,7 @@
         alert("Order number is required!");
       }
 
-      // ===== ORIGINAL FUNCTIONS =====
-      async function copyToClipboard() {
-        try {
-          await navigator.clipboard.writeText(document.getElementById('accNum').innerText);
-          alert('Account number copied to clipboard!');
-        } catch (err) {
-          alert('Failed to copy! Please manually select the text.');
-        }
-      }
-
+      // ===== SUBMIT FORM DATA =====
       document.getElementById('paymentForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         const file = e.target.uploadFile.files[0];
@@ -222,44 +213,78 @@
           </div>
         `;
 
-        // Simulate file upload (replace with your actual upload logic)
-        setTimeout(() => {
-          const data = {
-            orderNumber: orderNumber,
-            code: document.getElementById('hiddenCode').value,
-            name: document.getElementById('hiddenName').value,
-            price: document.getElementById('hiddenPrice').value,
-            url: "https://example.com/receipt.png",
-            branchPhone: document.getElementById('hiddenBranchPhone').value
-          };
+        try {
+          const fileData = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result.split(',')[1]);
+            reader.onerror = () => reject("Failed to read file");
+            reader.readAsDataURL(file);
+          });
 
-          const message = `Payment Confirmation
+          const response = await fetch("YOUR_GOOGLE_SCRIPT_URL", {
+            method: "POST",
+            body: JSON.stringify({
+              upload: {
+                name: file.name,
+                data: fileData,
+                contentType: file.type
+              },
+              orderNumber: document.getElementById('hiddenOrderNumber').value,
+              code: document.getElementById('hiddenCode').value,
+              name: document.getElementById('hiddenName').value,
+              price: document.getElementById('hiddenPrice').value,
+              branchPhone: document.getElementById('hiddenBranchPhone').value
+            }),
+            headers: {
+              "Content-Type": "application/json"
+            }
+          });
+
+          const data = await response.json();
+          if (data.success) {
+            const message = `Payment Confirmation
 Order Number: ${data.orderNumber}
 Code: ${data.code}
 Name: ${data.name}
 Price: $${data.price}
 Screenshot: ${data.url}`;
 
-          document.body.innerHTML = `
-          <div class="container">
-            <div class="header">
-              <h1>Payment Confirmed</h1>
+            document.body.innerHTML = `
+            <div class="container">
+              <div class="header">
+                <h1>Payment Confirmed</h1>
+              </div>
+              <div class="content">
+                <p><strong>Order Number:</strong> ${data.orderNumber}</p>
+                <p><strong>Code:</strong> ${data.code}</p>
+                <p><strong>Name:</strong> ${data.name}</p>
+                <p><strong>Price:</strong> $${data.price}</p>
+                <p><strong>Screenshot:</strong> <a href="${data.url}" target="_blank">View Receipt</a></p>
+                <button onclick="window.open('https://wa.me/${data.branchPhone}?text=${encodeURIComponent(message)}', '_blank')" 
+                  class="copy-btn">
+                  Send via WhatsApp
+                </button>
+              </div>
             </div>
-            <div class="content">
-              <p><strong>Order Number:</strong> ${data.orderNumber}</p>
-              <p><strong>Code:</strong> ${data.code}</p>
-              <p><strong>Name:</strong> ${data.name}</p>
-              <p><strong>Price:</strong> $${data.price}</p>
-              <p><strong>Screenshot:</strong> <a href="${data.url}" target="_blank">View Receipt</a></p>
-              <button onclick="window.open('https://wa.me/${data.branchPhone}?text=${encodeURIComponent(message)}', '_blank')" 
-                class="copy-btn">
-                Send via WhatsApp
-              </button>
-            </div>
-          </div>
-          `;
-        }, 2000);
+            `;
+          } else {
+            throw new Error(data.error);
+          }
+        } catch (error) {
+          alert("Error: " + error.message);
+          document.body.innerHTML = originalContent;
+        }
       });
+
+      // ===== COPY TO CLIPBOARD =====
+      async function copyToClipboard() {
+        try {
+          await navigator.clipboard.writeText(document.getElementById('accNum').innerText);
+          alert('Account number copied to clipboard!');
+        } catch (err) {
+          alert('Failed to copy! Please manually select the text.');
+        }
+      }
     </script>
   </body>
 </html>
