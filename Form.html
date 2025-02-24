@@ -94,6 +94,21 @@
             border-radius: 5px;
             background: #f0fff4;
         }
+
+        .account-info {
+            background: #fffbe6;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            text-align: center;
+        }
+
+        #accountNumber {
+            font-size: 1.2em;
+            font-weight: bold;
+            margin: 10px 0;
+            word-break: break-all;
+        }
     </style>
 </head>
 <body>
@@ -108,59 +123,65 @@
     </div>
 
     <script>
+        // ===== Configuration =====
         const CONFIG = {
-            scriptUrl: "https://script.google.com/macros/s/AKfycbwDxEfFwuREacfQEqY7y2h1JGGvlWtQJzoVlY8hYgisjAPcRHVg72z3Blxe1d0yxSi_/exec", // Replace with actual URL
-            timeout: 30000, // 30 seconds
+            scriptUrl: "https://script.google.com/macros/s/AKfycbwDxEfFwuREacfQEqY7y2h1JGGvlWtQJzoVlY8hYgisjAPcRHVg72z3Blxe1d0yxSi_/exec", // REPLACE WITH ACTUAL URL
             whatsappFormat: `Payment Confirmation
 Order Number: {orderNumber}
 Code: {code}
 Name: {name}
 Price: ${"$"}{price}
-Receipt: {url}`
+Receipt: {url}`,
+            accountNumber: "00010010016466",
+            maxFileSize: 5 * 1024 * 1024 // 5MB
         };
 
-        // Initialize application
-        (function init() {
+        // ===== Initialization =====
+        document.addEventListener('DOMContentLoaded', async () => {
             try {
-                const urlParams = new URLSearchParams(window.location.search);
-                const orderNumber = urlParams.get('orderNumber');
-
-                if (!validateOrderNumber(orderNumber)) {
-                    showError('Invalid or missing order number in URL');
-                    return;
-                }
-
-                loadOrderDetails(orderNumber);
+                const orderNumber = getOrderNumberFromURL();
+                if (!orderNumber) return;
+                
+                const orderData = await fetchOrderDetails(orderNumber);
+                renderPaymentForm(orderNumber, orderData);
             } catch (error) {
-                showError(`Initialization failed: ${error.message}`);
+                showError(error.message);
             }
-        })();
+        });
 
-        async function loadOrderDetails(orderNumber) {
+        // ===== Core Functions =====
+        function getOrderNumberFromURL() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const orderNumber = urlParams.get('orderNumber');
+            
+            if (!orderNumber || orderNumber.trim().length < 5) {
+                showError('Valid order number is required in URL');
+                return null;
+            }
+            return orderNumber.trim();
+        }
+
+        async function fetchOrderDetails(orderNumber) {
             try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), CONFIG.timeout);
-
-                const response = await fetch(
+                const response = await fetchWithTimeout(
                     `${CONFIG.scriptUrl}?orderNumber=${encodeURIComponent(orderNumber)}`,
-                    { signal: controller.signal }
+                    { timeout: 15000 }
                 );
 
-                clearTimeout(timeoutId);
-
-                if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
+                const data = await parseJSONResponse(response);
                 
-                const data = await response.json();
-                if (!data.success) throw new Error(data.error || 'Order load failed');
+                if (!data.success) {
+                    throw new Error(data.error || 'Failed to load order details');
+                }
 
-                renderPaymentForm(orderNumber, data.data);
+                return data.data;
             } catch (error) {
-                handleNetworkError(error, () => loadOrderDetails(orderNumber));
+                throw new Error(`Failed to fetch order: ${error.message}`);
             }
         }
 
         function renderPaymentForm(orderNumber, orderData) {
-            const content = `
+            const template = `
                 <div class="form-group">
                     <p><strong>Order Number:</strong> ${orderNumber}</p>
                     <p><strong>Code:</strong> ${orderData.code}</p>
@@ -174,7 +195,7 @@ Receipt: {url}`
                     <h3>Payment Instructions</h3>
                     <div class="account-info">
                         <p>BIBD Account Number:</p>
-                        <p id="accountNumber">00010010016466</p>
+                        <p id="accountNumber">${CONFIG.accountNumber}</p>
                         <button onclick="copyAccountNumber()">Copy Account Number</button>
                     </div>
                 </div>
@@ -187,32 +208,30 @@ Receipt: {url}`
                     <input type="hidden" name="branchPhone" value="${orderData.branchPhone}">
 
                     <div class="form-group">
-                        <label>Upload Payment Receipt (Image Only):</label>
-                        <input type="file" name="receipt" accept="image/*" required>
+                        <label>Upload Payment Receipt (PNG/JPG, max 5MB):</label>
+                        <input type="file" name="receipt" accept="image/png, image/jpeg" required>
                     </div>
 
                     <button type="submit">Submit Payment</button>
                 </form>
             `;
 
-            document.getElementById('content').innerHTML = content;
-            setupFormSubmission(orderNumber);
+            document.getElementById('content').innerHTML = template;
+            setupFormSubmission();
         }
 
-        function setupFormSubmission(orderNumber) {
+        // ===== Payment Submission =====
+        function setupFormSubmission() {
             document.getElementById('paymentForm').addEventListener('submit', async (e) => {
                 e.preventDefault();
-                
-                try {
-                    const formData = new FormData(e.target);
-                    const file = formData.get('receipt');
-                    
-                    if (!file || !validateFile(file)) {
-                        throw new Error('Invalid file. Please upload a PNG, JPG, or JPEG image (max 5MB)');
-                    }
+                const formData = new FormData(e.target);
+                const file = formData.get('receipt');
 
+                try {
+                    validateFile(file);
                     showLoading('Processing payment...');
-                    const result = await submitPayment(formData, file);
+                    
+                    const result = await processPayment(formData, file);
                     showConfirmation(result);
                 } catch (error) {
                     showError(error.message);
@@ -220,51 +239,64 @@ Receipt: {url}`
             });
         }
 
-        async function submitPayment(formData, file) {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), CONFIG.timeout);
-
+        async function processPayment(formData, file) {
             try {
-                const fileData = await readFile(file);
-                const response = await fetch(CONFIG.scriptUrl, {
+                const fileData = await readFileAsBase64(file);
+                const response = await fetchWithTimeout(CONFIG.scriptUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         upload: fileData,
-                        orderNumber: formData.get('orderNumber'),
-                        code: formData.get('code'),
-                        name: formData.get('name'),
-                        price: formData.get('price'),
-                        branchPhone: formData.get('branchPhone')
+                        ...Object.fromEntries(formData.entries())
                     }),
-                    signal: controller.signal
+                    timeout: 30000
                 });
 
-                clearTimeout(timeoutId);
-
-                if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
+                const data = await parseJSONResponse(response);
                 
-                const data = await response.json();
-                if (!data.success) throw new Error(data.error || 'Payment failed');
+                if (!data.success) {
+                    throw new Error(data.error || 'Payment processing failed');
+                }
 
                 return data.data;
             } catch (error) {
-                handleNetworkError(error, () => submitPayment(formData, file));
-                throw error;
+                throw new Error(`Payment failed: ${error.message}`);
             }
         }
 
-        // Helper functions
-        function validateOrderNumber(orderNumber) {
-            return orderNumber && orderNumber.trim().length > 5;
+        // ===== Helper Functions =====
+        async function fetchWithTimeout(url, { timeout = 15000 } = {}) {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+            const response = await fetch(url, {
+                signal: controller.signal
+            }).finally(() => clearTimeout(timeoutId));
+
+            if (!response.ok) {
+                throw new Error(`HTTP Error: ${response.status}`);
+            }
+            return response;
+        }
+
+        async function parseJSONResponse(response) {
+            const text = await response.text();
+            try {
+                return JSON.parse(text);
+            } catch {
+                throw new Error(`Invalid server response: ${text.slice(0, 100)}`);
+            }
         }
 
         function validateFile(file) {
-            const validTypes = ['image/jpeg', 'image/png', 'image/jpg'];
-            return file && validTypes.includes(file.type) && file.size <= 5 * 1024 * 1024;
+            if (!file) throw new Error('Please select a payment receipt');
+            if (file.size > CONFIG.maxFileSize) throw new Error('File size exceeds 5MB limit');
+            if (!['image/png', 'image/jpeg'].includes(file.type)) {
+                throw new Error('Only PNG and JPG files allowed');
+            }
         }
 
-        function readFile(file) {
+        function readFileAsBase64(file) {
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
                 reader.onload = () => resolve({
@@ -272,21 +304,16 @@ Receipt: {url}`
                     data: reader.result.split(',')[1],
                     contentType: file.type
                 });
-                reader.onerror = () => reject('File read failed');
+                reader.onerror = () => reject('Failed to read file');
                 reader.readAsDataURL(file);
             });
         }
 
-        function handleNetworkError(error, retryCallback) {
-            let message = error.message;
-            if (error.name === 'AbortError') {
-                message = 'Request timed out. Check your internet connection';
-            }
-            if (message.includes('Failed to fetch')) {
-                message = 'Network error. Check internet connection';
-            }
-            
-            showError(`${message}. <button onclick="window.location.reload()">Try Again</button>`);
+        // ===== UI Functions =====
+        function copyAccountNumber() {
+            navigator.clipboard.writeText(CONFIG.accountNumber)
+                .then(() => alert('Account number copied to clipboard!'))
+                .catch(() => alert('Failed to copy! Please select the text manually.'));
         }
 
         function showLoading(message) {
@@ -298,10 +325,12 @@ Receipt: {url}`
         }
 
         function showError(message) {
-            const content = document.getElementById('content');
-            content.innerHTML = `
+            document.getElementById('content').innerHTML = `
                 <div class="error-message">
                     <p>${message}</p>
+                    <button onclick="window.location.reload()" style="margin-top:10px">
+                        Try Again
+                    </button>
                 </div>
             `;
         }
@@ -316,21 +345,19 @@ Receipt: {url}`
 
             document.getElementById('content').innerHTML = `
                 <div class="success-message">
-                    <h2>Payment Confirmed!</h2>
-                    <p>Order Number: ${data.orderNumber}</p>
-                    <p>Amount Paid: ${"$"}${data.price}</p>
-                    <p>Receipt: <a href="${data.url}" target="_blank">View Receipt</a></p>
-                    <button onclick="window.open('https://wa.me/${data.branchPhone}?text=${encodeURIComponent(message)}', '_blank')">
-                        Send WhatsApp Confirmation
+                    <h2>Payment Successful!</h2>
+                    <p><strong>Order Number:</strong> ${data.orderNumber}</p>
+                    <p><strong>Amount Paid:</strong> ${"$"}${data.price}</p>
+                    <p><strong>Receipt:</strong> <a href="${data.url}" target="_blank">View Here</a></p>
+                    <button onclick="sendWhatsApp('${data.branchPhone}', '${encodeURIComponent(message)}')">
+                        Confirm via WhatsApp
                     </button>
                 </div>
             `;
         }
 
-        function copyAccountNumber() {
-            navigator.clipboard.writeText('00010010016466')
-                .then(() => alert('Account number copied!'))
-                .catch(() => alert('Copy failed. Please select the text manually.'));
+        function sendWhatsApp(phone, message) {
+            window.open(`https://wa.me/${phone}?text=${message}`, '_blank');
         }
     </script>
 </body>
