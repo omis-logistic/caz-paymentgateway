@@ -97,6 +97,15 @@
             border-radius: 8px;
             margin: 15px 0;
         }
+
+        .success-message {
+            background: #e8f5e9;
+            color: var(--success-green);
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            margin: 20px 0;
+        }
     </style>
 </head>
 <body>
@@ -112,23 +121,20 @@
     <script>
         // ===== Configuration =====
         const CONFIG = {
-            scriptUrl: "https://script.google.com/macros/s/AKfycbwDxEfFwuREacfQEqY7y2h1JGGvlWtQJzoVlY8hYgisjAPcRHVg72z3Blxe1d0yxSi_/exec", // Your actual GAS URL
+            scriptUrl: "https://script.google.com/macros/s/AKfycbwDxEfFwuREacfQEqY7y2h1JGGvlWtQJzoVlY8hYgisjAPcRHVg72z3Blxe1d0yxSi_/exec", // Replace with your actual GAS URL
             accountNumber: "00010010016466"
         };
 
         // ===== Initialize Application =====
         (async function init() {
             try {
-                // Get order number from URL
                 const urlParams = new URLSearchParams(window.location.search);
                 const orderNumber = urlParams.get('orderNumber');
                 
-                // Basic validation
                 if (!orderNumber || orderNumber.length < 3) {
                     throw new Error("Invalid or missing order number");
                 }
 
-                // Load order details
                 const orderData = await fetchOrderDetails(orderNumber);
                 renderPaymentForm(orderNumber, orderData);
                 setupFormHandlers(orderNumber, orderData);
@@ -142,15 +148,9 @@
         async function fetchOrderDetails(orderNumber) {
             try {
                 const response = await fetch(
-                    `${CONFIG.scriptUrl}?orderNumber=${encodeURIComponent(orderNumber)}`,
-                    { mode: 'no-cors' } // Bypass CORS for testing
+                    `${CONFIG.scriptUrl}?orderNumber=${encodeURIComponent(orderNumber)}`
                 );
-
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    throw new Error(`Server response: ${response.status} - ${errorText}`);
-                }
-
+                
                 const data = await response.json();
                 
                 if (!data.success) {
@@ -161,7 +161,7 @@
 
             } catch (error) {
                 console.error("Fetch Error:", error);
-                throw new Error("Failed to connect to server. Please try again.");
+                throw new Error("Failed to load order details. Please check the order number.");
             }
         }
 
@@ -186,7 +186,6 @@
                     <input type="hidden" name="code" value="${orderData.code}">
                     <input type="hidden" name="name" value="${orderData.name}">
                     <input type="hidden" name="price" value="${orderData.price}">
-                    <input type="hidden" name="branchPhone" value="${orderData.branchPhone}">
 
                     <label>Upload Payment Receipt (PNG/JPG):</label>
                     <input type="file" name="receipt" accept="image/*" required>
@@ -223,20 +222,21 @@
             formData.append('code', orderData.code);
             formData.append('name', orderData.name);
             formData.append('price', orderData.price);
-            formData.append('branchPhone', orderData.branchPhone);
             formData.append('receipt', file);
 
             try {
                 const response = await fetch(CONFIG.scriptUrl, {
                     method: 'POST',
-                    body: formData,
+                    body: formData
                 });
 
-                if (!response.ok) {
-                    throw new Error("Payment submission failed");
+                const data = await response.json();
+                
+                if (!data.success) {
+                    throw new Error(data.error || "Payment submission failed");
                 }
 
-                return await response.json();
+                return data;
 
             } catch (error) {
                 console.error("Payment Error:", error);
