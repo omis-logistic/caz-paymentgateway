@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, shrink-to-fit=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
       /* Loading Screen Styles */
       #loading {
@@ -79,37 +79,44 @@
     </div>
 
     <script>
-      // Extract order number from URL
+      const scriptUrl = 'https://script.google.com/macros/s/AKfycbwDxEfFwuREacfQEqY7y2h1JGGvlWtQJzoVlY8hYgisjAPcRHVg72z3Blxe1d0yxSi_/exec'; // Replace with your web app URL
       const urlParams = new URLSearchParams(window.location.search);
       const orderNumber = urlParams.get('orderNumber');
-      const scriptUrl = 'https://script.google.com/macros/s/AKfycbwDxEfFwuREacfQEqY7y2h1JGGvlWtQJzoVlY8hYgisjAPcRHVg72z3Blxe1d0yxSi_/exec'; // Replace with your deployed web app URL
 
-      // Load initial data
-      window.addEventListener('DOMContentLoaded', async () => {
+      async function loadOrderDetails() {
         try {
-          const response = await fetch(`${scriptUrl}?orderNumber=${orderNumber}`);
-          const text = await response.text();
-          const parser = new DOMParser();
-          const doc = parser.parseFromString(text, 'text/html');
+          if (!orderNumber) throw new Error('Missing order number in URL');
           
-          // Extract data from hidden elements
+          const response = await fetch(${scriptUrl}?orderNumber=${orderNumber});
+          const result = await response.json();
+          
+          if (!result.success) throw new Error(result.error);
+          
+          // Populate data fields
           document.getElementById('orderNumber').textContent = orderNumber;
-          document.getElementById('code').textContent = doc.querySelector('[name="code"]').value;
-          document.getElementById('name').textContent = doc.querySelector('[name="name"]').value;
-          document.getElementById('price').textContent = doc.querySelector('[name="price"]').value;
+          document.getElementById('code').textContent = result.data.code;
+          document.getElementById('name').textContent = result.data.name;
+          document.getElementById('price').textContent = result.data.price;
           
           // Set form values
           document.getElementById('formOrderNumber').value = orderNumber;
-          document.getElementById('formCode').value = doc.querySelector('[name="code"]').value;
-          document.getElementById('formName').value = doc.querySelector('[name="name"]').value;
-          document.getElementById('formPrice').value = doc.querySelector('[name="price"]').value;
-          document.getElementById('formBranchPhone').value = doc.querySelector('[name="branchPhone"]').value;
+          document.getElementById('formCode').value = result.data.code;
+          document.getElementById('formName').value = result.data.name;
+          document.getElementById('formPrice').value = result.data.price;
+          document.getElementById('formBranchPhone').value = result.data.branchPhone;
 
           // Show content
           document.getElementById('loading').style.display = 'none';
           document.querySelector('.container').style.display = 'block';
+          
         } catch (error) {
           alert('Error loading order details: ' + error.message);
+          document.getElementById('loading').style.display = 'none';
+        }
+      }
+
+      // Start loading when page loads
+      window.addEventListener('DOMContentLoaded', loadOrderDetails);
         }
       });
 
