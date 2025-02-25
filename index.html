@@ -2,6 +2,7 @@
 <html>
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Payment Gateway</title>
     <style>
         :root {
             --gold: #D4AF37;
@@ -90,6 +91,7 @@
             border: 1px solid var(--gold);
             border-radius: 4px;
             word-break: break-word;
+            text-align: center;
         }
 
         .copy-btn, input[type="submit"] {
@@ -100,6 +102,7 @@
             border-radius: 4px;
             cursor: pointer;
             width: 100%;
+            font-size: 16px;
         }
 
         input[type="file"] {
@@ -130,6 +133,10 @@
             .copy-btn {
                 width: auto;
                 min-width: 140px;
+            }
+
+            #accNum {
+                text-align: left;
             }
         }
     </style>
@@ -196,8 +203,9 @@
     <script>
         const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzYDlCxrfhCvhBZDowNzwy3aRTpUNc6R_V9eMWXRnjpIpnCAVSBuezUiVbiv_A6tQiS/exec";
         let currentOrder = null;
+        let timeoutId;
 
-        // 1. Clipboard Function (Working)
+        // 1. Clipboard Function
         function copyToClipboard() {
             const accNum = document.getElementById('accNum');
             const tempInput = document.createElement('input');
@@ -214,50 +222,32 @@
             document.body.removeChild(tempInput);
         }
 
-        // 2. Order Data Loader (Fixed)
-        function loadOrderData() {
-            const urlParams = new URLSearchParams(window.location.search);
-            const orderNumber = urlParams.get('orderNumber');
-
-            if (!orderNumber) {
-                showError('Order number is required in URL');
-                return;
-            }
-
-            const script = document.createElement('script');
-            script.src = `${SCRIPT_URL}?orderNumber=${encodeURIComponent(orderNumber)}&callback=handleOrderData`;
-            script.onerror = () => showError('Failed to load order details');
-            document.head.appendChild(script);
-
-            setTimeout(() => {
-                if (!currentOrder) showError('Server response timed out');
-            }, 10000);
-        }
-
-        // 3. Order Data Handler (Simplified)
+        // 2. Order Data Handler
         function handleOrderData(response) {
+            clearTimeout(timeoutId);
             const loader = document.getElementById('loader');
-            loader.style.display = 'none';
-
+            
             if (response.error) {
                 showError(response.error);
                 return;
             }
 
-            currentOrder = response.data;
-            document.getElementById('orderNumber').textContent = currentOrder.orderNumber;
-            document.getElementById('code').textContent = currentOrder.code;
-            document.getElementById('name').textContent = currentOrder.name;
-            document.getElementById('price').textContent = currentOrder.price;
-            document.getElementById('branchPhone').value = currentOrder.branchPhone;
+            currentOrder = response;
+            document.getElementById('orderNumber').textContent = response.orderNumber;
+            document.getElementById('code').textContent = response.code;
+            document.getElementById('name').textContent = response.name;
+            document.getElementById('price').textContent = response.price;
+            document.getElementById('branchPhone').value = response.branchPhone;
+            
+            loader.style.display = 'none';
             document.getElementById('mainContainer').style.display = 'block';
         }
 
-        // 4. Payment Handler (Fixed)
+        // 3. Payment Submission
         async function handlePaymentSubmit(e) {
             e.preventDefault();
-            
             const fileInput = document.getElementById('paymentForm').uploadFile;
+            
             if (!fileInput.files.length) {
                 alert('Please select a payment screenshot');
                 return;
@@ -294,7 +284,7 @@
             }
         }
 
-        // 5. Helper Functions
+        // 4. Helper Functions
         function readFile(file) {
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
@@ -328,6 +318,7 @@ Receipt: ${data.url}`;
         }
 
         function showError(message) {
+            clearTimeout(timeoutId);
             document.getElementById('loader').style.display = 'none';
             document.getElementById('errorContainer').innerHTML = `
                 <h2>⚠️ Error</h2>
@@ -337,10 +328,29 @@ Receipt: ${data.url}`;
             document.getElementById('errorContainer').style.display = 'block';
         }
 
-        // Initialization
+        // 5. Initialization
         document.addEventListener('DOMContentLoaded', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            let orderNumber = urlParams.get('orderNumber') || '';
+            orderNumber = orderNumber.toUpperCase().trim();
+
+            if (!orderNumber) {
+                showError('Order number is required in URL');
+                return;
+            }
+
+            // Load order data
             document.getElementById('paymentForm').addEventListener('submit', handlePaymentSubmit);
-            loadOrderData();
+            
+            const script = document.createElement('script');
+            script.src = `${SCRIPT_URL}?orderNumber=${encodeURIComponent(orderNumber)}&callback=handleOrderData`;
+            script.onerror = () => showError('Failed to connect to server');
+            document.head.appendChild(script);
+
+            // 30-second timeout
+            timeoutId = setTimeout(() => {
+                showError('Server is taking longer than expected. Please try again.');
+            }, 30000);
         });
     </script>
 </body>
