@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <style>
+    /* Original CSS styles (removed banner-related code) */
+    :root { --gold: #D4AF37; --white: #FFFFFF; --text-dark: #333333; }
+    * { box-sizing: border-box; -webkit-text-size-adjust: none; }
+    body { font-family: Arial, sans-serif; margin: 0; padding: 0; 
+      background: var(--white); color: var(--text-dark); font-size: 14px; }
+    .container { width: 100%; max-width: 100%; margin: 0 auto; }
+    .header { background: var(--gold); padding: 15px; text-align: center; }
+    .content { padding: 15px; width: 100%; }
+    #accNum { display: block; width: 100%; font-size: 16px; text-align: center;
+      margin: 10px 0; padding: 12px; background: #FFFBE6; border: 1px solid var(--gold); }
+    .copy-btn, input[type="submit"] { display: block; width: 100%; background: var(--gold);
+      color: white; border: none; padding: 12px; border-radius: 4px; margin: 10px 0; }
+    input[type="file"] { display: block; width: 100%; padding: 12px; margin: 15px 0;
+      border: 2px dashed var(--gold); background: #FFFBE6; }
+    @media (min-width: 768px) {
+      body { padding: 20px; background: #f0f0f0; }
+      .container { width: 600px; border-radius: 10px; box-shadow: 0 2px 15px rgba(0,0,0,0.1); }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Payment Gateway</h1>
+    </div>
+    <div class="content">
+      <p><strong>Order Number:</strong> <span id="orderNumber"></span></p>
+      <p><strong>Code:</strong> <span id="code"></span></p>
+      <p><strong>Name:</strong> <span id="name"></span></p>
+      <p><strong>Price:</strong> $<span id="price"></span></p>
+      <hr>
+      <h3>Payment Instructions</h3>
+      <p style="color: var(--gold); font-weight: bold;">BIBD Transfer</p>
+      <div class="account-row">
+        <span id="accNum">00010010016466</span>
+        <button class="copy-btn" onclick="copyToClipboard()">Copy Account Number</button>
+      </div>
+      <form id="paymentForm">
+        <input type="hidden" id="branchPhone">
+        <p>Upload payment screenshot:</p>
+        <input type="file" name="uploadFile" accept="image/*" required>
+        <input type="submit" value="Submit Payment">
+      </form>
+    </div>
+  </div>
+
+  <script>
+    // Replace with your Apps Script URL
+    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwnzcx9Mew530l94uF7nMadEyrG1VJmHuW2sdsGOBhDl0Zufv66FIOZICxz8EQRymXf/exec';
+
+    // Load order data on page load
+    document.addEventListener('DOMContentLoaded', async () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const orderNumber = urlParams.get('orderNumber');
+
+      if (!orderNumber) {
+        showError('Order number is required in URL parameters');
+        return;
+      }
+
+      try {
+        const data = await fetchOrderData(orderNumber);
+        populateForm(data);
+      } catch (error) {
+        showError(error.message);
+      }
+    });
+
+    async function fetchOrderData(orderNumber) {
+      const response = await fetch(`${SCRIPT_URL}?action=getOrder&orderNumber=${orderNumber}`);
+      const data = await response.json();
+      if (data.error) throw new Error(data.error);
+      return data;
+    }
+
+    function populateForm(orderData) {
+      document.getElementById('orderNumber').textContent = orderData.orderNumber || '';
+      document.getElementById('code').textContent = orderData.code || '';
+      document.getElementById('name').textContent = orderData.name || '';
+      document.getElementById('price').textContent = orderData.price || '';
+      document.getElementById('branchPhone').value = orderData.branchPhone || '';
+    }
+
+    async function copyToClipboard() {
+      try {
+        await navigator.clipboard.writeText('00010010016466');
+        alert('Account number copied!');
+      } catch (err) {
+        alert('Failed to copy! Please manually select the text.');
+      }
+    }
+
+    document.getElementById('paymentForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const file = e.target.uploadFile.files[0];
+      if (!file) return alert('Please select a payment screenshot!');
+
+      const formData = {
+        orderNumber: document.getElementById('orderNumber').textContent,
+        code: document.getElementById('code').textContent,
+        name: document.getElementById('name').textContent,
+        price: document.getElementById('price').textContent,
+        branchPhone: document.getElementById('branchPhone').value,
+        upload: {
+          name: file.name,
+          data: await toBase64(file),
+          contentType: file.type
+        }
+      };
+
+      showLoading();
+      
+      try {
+        const response = await fetch(SCRIPT_URL, {
+          method: 'POST',
+          body: JSON.stringify(formData),
+          headers: { 'Content-Type': 'application/json' }
+        });
+        const result = await response.json();
+        
+        if (result.success) showSuccess(result);
+        else throw new Error(result.error);
+      } catch (error) {
+        alert('Error: ' + error.message);
+        location.reload();
+      }
+    });
+
+    function toBase64(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result.split(',')[1]);
+        reader.onerror = error => reject(error);
+      });
+    }
+
+    function showLoading() {
+      document.body.innerHTML = `
+        <div class="container">
+          <div class="header"><h1>Processing Payment</h1></div>
+          <div class="content"><p>Please wait...</p></div>
+        </div>`;
+    }
+
+    function showSuccess(data) {
+      const message = `Payment Confirmation
+Order Number: ${data.orderNumber}
+Code: ${data.code}
+Name: ${data.name}
+Price: $${data.price}
+Screenshot: ${data.url}`;
+
+      document.body.innerHTML = `
+        <div class="container">
+          <div class="header"><h1>Payment Confirmed</h1></div>
+          <div class="content">
+            <p><strong>Order Number:</strong> ${data.orderNumber}</p>
+            <p><a href="${data.url}" target="_blank">View Receipt</a></p>
+            <button onclick="window.open('https://wa.me/${data.branchPhone}?text=${encodeURIComponent(message)}', '_blank')" 
+              class="copy-btn">
+              Send via WhatsApp
+            </button>
+          </div>
+        </div>`;
+    }
+
+    function showError(message) {
+      document.body.innerHTML = `
+        <div class="container">
+          <div class="header"><h1>⚠️ Error</h1></div>
+          <div class="content"><p>${message}</p></div>
+        </div>`;
+    }
+  </script>
+</body>
+</html>
