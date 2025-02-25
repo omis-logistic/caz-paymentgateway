@@ -1,196 +1,301 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, shrink-to-fit=no">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Payment Gateway</title>
     <style>
-      /* Loading Screen Styles */
-      #loading {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: white;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        z-index: 9999;
-      }
+        /* Loading Screen */
+        #loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            flex-direction: column;
+        }
 
-      .loading-spinner {
-        border: 4px solid #f3f3f3;
-        border-top: 4px solid #D4AF37;
-        border-radius: 50%;
-        width: 40px;
-        height: 40px;
-        animation: spin 1s linear infinite;
-      }
+        .loading-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #D4AF37;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
 
-      @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-      }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
 
-      /* Original Styles (same as before) */
-      :root { --gold: #D4AF37; --white: #FFFFFF; --text-dark: #333333; }
-      * { box-sizing: border-box; -webkit-text-size-adjust: none; }
-      body { font-family: Arial, sans-serif; margin: 0; padding: 0; width: 100vw; background: var(--white); }
-      /* ... maintain all original styles from Form.html ... */
+        /* Main Styles */
+        :root {
+            --gold: #D4AF37;
+            --white: #FFFFFF;
+            --text-dark: #333333;
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-text-size-adjust: none;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: var(--white);
+            color: var(--text-dark);
+            font-size: 14px;
+            line-height: 1.4;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            display: none; /* Hidden initially */
+        }
+
+        .header {
+            background: var(--gold);
+            padding: 15px;
+            text-align: center;
+            position: sticky;
+            top: 0;
+        }
+
+        .content {
+            padding: 20px;
+        }
+
+        .account-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        #accNum {
+            flex: 1;
+            padding: 12px;
+            background: #FFFBE6;
+            border: 1px solid var(--gold);
+            border-radius: 4px;
+            word-break: break-all;
+        }
+
+        .copy-btn, input[type="submit"] {
+            background: var(--gold);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+        }
+
+        input[type="file"] {
+            width: 100%;
+            padding: 12px;
+            margin: 20px 0;
+            border: 2px dashed var(--gold);
+            background: #FFFBE6;
+            border-radius: 4px;
+        }
+
+        @media (min-width: 768px) {
+            body {
+                padding: 20px;
+                background: #f0f0f0;
+            }
+            .container {
+                border-radius: 10px;
+                box-shadow: 0 2px 15px rgba(0,0,0,0.1);
+            }
+            .copy-btn {
+                width: auto;
+            }
+        }
     </style>
-  </head>
-  <body>
+</head>
+<body>
     <div id="loading">
-      <div class="loading-spinner"></div>
+        <div class="loading-spinner"></div>
+        <p>Loading Order Details...</p>
     </div>
 
-    <div class="container" style="display: none;">
-      <!-- Maintain original HTML structure -->
-      <div class="header">
-        <h1>Payment Gateway</h1>
-      </div>
-      
-      <div class="content">
-        <p><strong>Order Number:</strong> <span id="orderNumber"></span></p>
-        <p><strong>Code:</strong> <span id="code"></span></p>
-        <p><strong>Name:</strong> <span id="name"></span></p>
-        <p><strong>Price:</strong> $<span id="price"></span></p>
-        
-        <hr>
-        
-        <h3>Payment Instructions</h3>
-        <p style="color: var(--gold); font-weight: bold;">BIBD Transfer</p>
-        <div class="account-row">
-          <span id="accNum">00010010016466</span>
-          <button class="copy-btn" onclick="copyToClipboard()">Copy Account Number</button>
+    <div class="container">
+        <div class="header">
+            <h1>Payment Gateway</h1>
         </div>
         
-        <form id="paymentForm">
-          <input type="hidden" id="formOrderNumber" name="orderNumber">
-          <input type="hidden" id="formCode" name="code">
-          <input type="hidden" id="formName" name="name">
-          <input type="hidden" id="formPrice" name="price">
-          <input type="hidden" id="formBranchPhone" name="branchPhone">
-          
-          <p>Upload payment screenshot:</p>
-          <input type="file" name="uploadFile" accept="image/*" required>
-          <input type="submit" value="Submit Payment">
-        </form>
-      </div>
+        <div class="content">
+            <p><strong>Order Number:</strong> <span id="orderNumber"></span></p>
+            <p><strong>Code:</strong> <span id="code"></span></p>
+            <p><strong>Name:</strong> <span id="name"></span></p>
+            <p><strong>Price:</strong> $<span id="price"></span></p>
+            
+            <hr>
+            
+            <h3>Payment Instructions</h3>
+            <p style="color: var(--gold); font-weight: bold;">BIBD Transfer</p>
+            <div class="account-row">
+                <span id="accNum">00010010016466</span>
+                <button class="copy-btn" onclick="copyToClipboard()">Copy Account Number</button>
+            </div>
+            
+            <form id="paymentForm">
+                <input type="hidden" id="formOrderNumber" name="orderNumber">
+                <input type="hidden" id="formCode" name="code">
+                <input type="hidden" id="formName" name="name">
+                <input type="hidden" id="formPrice" name="price">
+                <input type="hidden" id="formBranchPhone" name="branchPhone">
+                
+                <p>Upload payment screenshot:</p>
+                <input type="file" name="uploadFile" accept="image/*" required>
+                <input type="submit" value="Submit Payment">
+            </form>
+        </div>
     </div>
 
     <script>
-      // Extract order number from URL
-      const urlParams = new URLSearchParams(window.location.search);
-      const orderNumber = urlParams.get('orderNumber');
-      const scriptUrl = 'https://script.google.com/macros/s/AKfycbyxWkXLEbvFiuWLT09PaLVCT5_xdSHC-kUHglxzmetDn67sShyFuPWk0hsHnrcfk1So/exec'; // Replace with your deployed web app URL
+        const scriptUrl = 'https://script.google.com/macros/s/AKfycbxDq5PmFspIq_15FdJmfs-qStoCtyN9IKKUJwOswpp_FP6FCxbyfSW3OBq2l8UiiHWb/exec'; // REPLACE WITH YOUR URL
 
-      // Load initial data
-      window.addEventListener('DOMContentLoaded', async () => {
-        try {
-          const response = await fetch(`${scriptUrl}?orderNumber=${orderNumber}`);
-          const text = await response.text();
-          const parser = new DOMParser();
-          const doc = parser.parseFromString(text, 'text/html');
-          
-          // Extract data from hidden elements
-          document.getElementById('orderNumber').textContent = orderNumber;
-          document.getElementById('code').textContent = doc.querySelector('[name="code"]').value;
-          document.getElementById('name').textContent = doc.querySelector('[name="name"]').value;
-          document.getElementById('price').textContent = doc.querySelector('[name="price"]').value;
-          
-          // Set form values
-          document.getElementById('formOrderNumber').value = orderNumber;
-          document.getElementById('formCode').value = doc.querySelector('[name="code"]').value;
-          document.getElementById('formName').value = doc.querySelector('[name="name"]').value;
-          document.getElementById('formPrice').value = doc.querySelector('[name="price"]').value;
-          document.getElementById('formBranchPhone').value = doc.querySelector('[name="branchPhone"]').value;
+        async function initialize() {
+            try {
+                const urlParams = new URLSearchParams(window.location.search);
+                const orderNumber = urlParams.get('orderNumber')?.trim();
+                
+                if (!orderNumber) throw new Error('Missing order number in URL');
+                
+                const response = await fetch(`${scriptUrl}?orderNumber=${encodeURIComponent(orderNumber)}`);
+                
+                if (!response.ok) throw new Error(`Server response error: ${response.status}`);
+                
+                const result = await response.json();
+                
+                if (!result.success) throw new Error(result.error || 'Failed to load order details');
+                
+                // Populate visible data
+                document.getElementById('orderNumber').textContent = orderNumber;
+                document.getElementById('code').textContent = result.data.code || 'N/A';
+                document.getElementById('name').textContent = result.data.name || 'N/A';
+                document.getElementById('price').textContent = result.data.price || '0.00';
+                
+                // Set form data
+                document.getElementById('formOrderNumber').value = orderNumber;
+                document.getElementById('formCode').value = result.data.code;
+                document.getElementById('formName').value = result.data.name;
+                document.getElementById('formPrice').value = result.data.price;
+                document.getElementById('formBranchPhone').value = result.data.branchPhone;
 
-          // Show content
-          document.getElementById('loading').style.display = 'none';
-          document.querySelector('.container').style.display = 'block';
-        } catch (error) {
-          alert('Error loading order details: ' + error.message);
-        }
-      });
+                // Show content
+                document.getElementById('loading').style.display = 'none';
+                document.querySelector('.container').style.display = 'block';
 
-      // Form submission handler
-      document.getElementById('paymentForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const formData = new FormData(e.target);
-        const file = formData.get('uploadFile');
-        
-        if (!file) {
-          alert('Please select a payment screenshot first!');
-          return;
-        }
-
-        // Show processing screen
-        document.getElementById('loading').style.display = 'flex';
-        
-        try {
-          const reader = new FileReader();
-          reader.readAsDataURL(file);
-          reader.onload = async () => {
-            const base64Data = reader.result.split(',')[1];
-            const payload = {
-              orderNumber: document.getElementById('formOrderNumber').value,
-              code: document.getElementById('formCode').value,
-              name: document.getElementById('formName').value,
-              price: document.getElementById('formPrice').value,
-              branchPhone: document.getElementById('formBranchPhone').value,
-              upload: {
-                name: file.name,
-                data: base64Data,
-                contentType: file.type
-              }
-            };
-
-            const response = await fetch(scriptUrl, {
-              method: 'POST',
-              body: JSON.stringify(payload),
-              headers: { 'Content-Type': 'application/json' }
-            });
-
-            const data = await response.json();
-            
-            if (data.success) {
-              // Show success message
-              document.querySelector('.container').innerHTML = `
-                <div class="header">
-                  <h1>Payment Confirmed</h1>
-                </div>
-                <div class="content">
-                  <p><strong>Order Number:</strong> ${data.orderNumber}</p>
-                  <p><strong>Code:</strong> ${data.code}</p>
-                  <p><strong>Name:</strong> ${data.name}</p>
-                  <p><strong>Price:</strong> $${data.price}</p>
-                  <p><strong>Screenshot:</strong> <a href="${data.url}" target="_blank">View Receipt</a></p>
-                  <button onclick="window.open('https://wa.me/${data.branchPhone}?text=${encodeURIComponent(message)}', '_blank')" 
-                    class="copy-btn">
-                    Send via WhatsApp
-                  </button>
-                </div>
-              `;
-            } else {
-              alert('Payment failed: ' + (data.error || 'Unknown error'));
+            } catch (error) {
+                document.getElementById('loading').innerHTML = `
+                    <div style="text-align: center; color: #B8860B;">
+                        <h2>⚠️ Loading Error</h2>
+                        <p>${error.message}</p>
+                        <p>Please check the order number or contact support</p>
+                    </div>
+                `;
+                console.error('Initialization error:', error);
             }
-          };
-        } catch (error) {
-          alert('Error: ' + error.message);
-        } finally {
-          document.getElementById('loading').style.display = 'none';
         }
-      });
 
-      // Maintain original copyToClipboard function
-      async function copyToClipboard() {
-        try {
-          await navigator.clipboard.writeText(document.getElementById('accNum').innerText);
-          alert('Account number copied to clipboard!');
-        } catch (err) {
-          alert('Failed to copy! Please manually select the text.');
+        // Form Submission Handler
+        document.getElementById('paymentForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const file = formData.get('uploadFile');
+            
+            if (!file) {
+                alert('Please select a payment screenshot first!');
+                return;
+            }
+
+            // Show loading
+            document.getElementById('loading').style.display = 'flex';
+            
+            try {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                
+                reader.onload = async () => {
+                    const base64Data = reader.result.split(',')[1];
+                    const payload = {
+                        orderNumber: document.getElementById('formOrderNumber').value,
+                        code: document.getElementById('formCode').value,
+                        name: document.getElementById('formName').value,
+                        price: document.getElementById('formPrice').value,
+                        branchPhone: document.getElementById('formBranchPhone').value,
+                        upload: {
+                            name: file.name,
+                            data: base64Data,
+                            contentType: file.type
+                        }
+                    };
+
+                    const response = await fetch(scriptUrl, {
+                        method: 'POST',
+                        body: JSON.stringify(payload),
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        const message = `Payment Confirmation\nOrder Number: ${data.orderNumber}\nCode: ${data.code}\nName: ${data.name}\nPrice: $${data.price}\nScreenshot: ${data.url}`;
+                        
+                        document.querySelector('.container').innerHTML = `
+                            <div class="header">
+                                <h1>Payment Confirmed</h1>
+                            </div>
+                            <div class="content">
+                                <p><strong>Order Number:</strong> ${data.orderNumber}</p>
+                                <p><strong>Code:</strong> ${data.code}</p>
+                                <p><strong>Name:</strong> ${data.name}</p>
+                                <p><strong>Price:</strong> $${data.price}</p>
+                                <p><strong>Receipt:</strong> <a href="${data.url}" target="_blank">View</a></p>
+                                <button onclick="window.open('https://wa.me/${data.branchPhone}?text=${encodeURIComponent(message)}', '_blank')" 
+                                    class="copy-btn">
+                                    Send via WhatsApp
+                                </button>
+                            </div>
+                        `;
+                    } else {
+                        throw new Error(data.error || 'Payment submission failed');
+                    }
+                };
+                
+            } catch (error) {
+                alert('Error: ' + error.message);
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+            }
+        });
+
+        // Clipboard Function
+        async function copyToClipboard() {
+            try {
+                await navigator.clipboard.writeText(document.getElementById('accNum').textContent);
+                alert('Account number copied to clipboard!');
+            } catch (err) {
+                alert('Failed to copy! Please manually select the text.');
+            }
         }
-      }
+
+        // Initialize when ready
+        window.addEventListener('DOMContentLoaded', initialize);
     </script>
-  </body>
+</body>
 </html>
