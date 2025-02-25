@@ -5,8 +5,8 @@
     <style>
         :root {
             --gold: #D4AF37;
-            --white: #FFFFFF;
             --error: #dc3545;
+            --success: #28a745;
         }
 
         body {
@@ -36,11 +36,28 @@
             padding: 20px;
         }
 
-        .error {
-            color: var(--error);
-            padding: 10px;
+        .alert {
+            padding: 15px;
             margin: 15px 0;
+            border-radius: 5px;
             display: none;
+        }
+
+        .alert-error {
+            background: #f8d7da;
+            color: var(--error);
+        }
+
+        .alert-success {
+            background: #d4edda;
+            color: var(--success);
+        }
+
+        .payment-instructions {
+            background: #fffbe6;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
         }
 
         input[type="file"] {
@@ -57,10 +74,12 @@
             padding: 15px;
             width: 100%;
             cursor: pointer;
+            font-size: 16px;
         }
 
         button:disabled {
             opacity: 0.7;
+            cursor: not-allowed;
         }
     </style>
 </head>
@@ -69,60 +88,77 @@
         <div class="header">
             <h1>Payment Gateway</h1>
         </div>
+        
         <div class="content">
-            <div class="error" id="error"></div>
+            <div class="alert alert-error" id="error"></div>
+            <div class="alert alert-success" id="success"></div>
+
             <div id="order-info">
-                <p><strong>Order:</strong> <span id="order-number"></span></p>
+                <p><strong>Order Number:</strong> <span id="order-number"></span></p>
                 <p><strong>Code:</strong> <span id="code"></span></p>
                 <p><strong>Name:</strong> <span id="name"></span></p>
                 <p><strong>Amount:</strong> $<span id="amount"></span></p>
             </div>
+
             <hr>
-            <h3>Payment Instructions</h3>
-            <div style="background: #fffbe6; padding: 15px; border-radius: 5px;">
-                <p>BIBD Account: <strong id="account">00010010016466</strong></p>
-                <button onclick="copyAccount()">Copy Account</button>
+
+            <div class="payment-instructions">
+                <h3>Payment Instructions</h3>
+                <p>BIBD Account Number:</p>
+                <p id="account-number">00010010016466</p>
+                <button onclick="copyAccount()">Copy Account Number</button>
             </div>
+
             <form id="payment-form">
+                <label>Upload Payment Receipt (Image Only):</label>
                 <input type="file" id="receipt" accept="image/*" required>
-                <button type="submit" id="submit-btn">Submit Payment</button>
+                <button type="submit" id="submit-btn">Confirm Payment</button>
             </form>
         </div>
     </div>
 
     <script>
-        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwDxEfFwuREacfQEqY7y2h1JGGvlWtQJzoVlY8hYgisjAPcRHVg72z3Blxe1d0yxSi_/exec'; // Replace with your Apps Script URL
+        const SCRIPT_ID = 'https://script.google.com/macros/s/AKfycbwDxEfFwuREacfQEqY7y2h1JGGvlWtQJzoVlY8hYgisjAPcRHVg72z3Blxe1d0yxSi_/exec'; // Replace with your deployment ID
 
-        // Initialize
+        // Initialize on page load
         (async () => {
             try {
                 const urlParams = new URLSearchParams(window.location.search);
                 const orderNumber = urlParams.get('orderNumber');
-                if (!orderNumber) throw new Error('Add ?orderNumber=YOUR_NUMBER to URL');
                 
+                if (!orderNumber) {
+                    showError('Add ?orderNumber=YOUR_NUMBER to URL');
+                    return;
+                }
+
+                // Fetch order details
                 const orderData = await fetchOrder(orderNumber);
                 updateDisplay(orderData);
+
             } catch (error) {
                 showError(error.message);
             }
         })();
 
-        // Fetch order data
         async function fetchOrder(orderNumber) {
             try {
-                const response = await fetch(`${SCRIPT_URL}?orderNumber=${encodeURIComponent(orderNumber)}`);
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const response = await fetch(
+                    `https://script.google.com/macros/s/${SCRIPT_ID}/exec?orderNumber=${encodeURIComponent(orderNumber)}`,
+                    { redirect: 'follow' }
+                );
+
+                if (!response.ok) throw new Error('Network response failed');
                 
                 const data = await response.json();
                 if (data.error) throw new Error(data.error);
-                
+
                 return data;
+                
             } catch (error) {
                 throw new Error(`Failed to load order: ${error.message}`);
             }
         }
 
-        // Update UI
         function updateDisplay(data) {
             document.getElementById('order-number').textContent = data.orderNumber;
             document.getElementById('code').textContent = data.code;
@@ -130,70 +166,96 @@
             document.getElementById('amount').textContent = data.price;
         }
 
-        // Handle form submission
+        // Form submission handler
         document.getElementById('payment-form').addEventListener('submit', async (e) => {
             e.preventDefault();
+            const submitBtn = document.getElementById('submit-btn');
+            
             try {
-                disableForm(true);
+                submitBtn.disabled = true;
+                showLoading();
+
                 const file = document.getElementById('receipt').files[0];
-                if (!file) throw new Error('Select a payment receipt');
-                
+                if (!file) throw new Error('Please select a payment receipt');
+
                 const result = await processPayment(file);
                 showSuccess(result);
+
             } catch (error) {
                 showError(error.message);
             } finally {
-                disableForm(false);
+                submitBtn.disabled = false;
+                hideLoading();
             }
         });
 
-        // Process file upload
         async function processPayment(file) {
             const reader = new FileReader();
+            
+            // Read file as base64
             reader.readAsDataURL(file);
-            
             await new Promise((resolve) => reader.onload = resolve);
-            
-            const response = await fetch(SCRIPT_URL, {
-                method: 'POST',
-                body: JSON.stringify({
-                    orderNumber: document.getElementById('order-number').textContent,
-                    code: document.getElementById('code').textContent,
-                    name: document.getElementById('name').textContent,
-                    price: document.getElementById('amount').textContent,
-                    file: {
-                        name: file.name,
-                        type: file.type,
-                        data: reader.result.split(',')[1]
-                    }
-                }),
-                headers: { 'Content-Type': 'application/json' }
-            });
-            
-            if (!response.ok) throw new Error('Payment failed');
+
+            // Prepare payload
+            const payload = {
+                orderNumber: document.getElementById('order-number').textContent,
+                code: document.getElementById('code').textContent,
+                name: document.getElementById('name').textContent,
+                price: document.getElementById('amount').textContent,
+                branchPhone: '<?= orderData.branchPhone ?>', // Will be populated by server
+                upload: {
+                    name: file.name,
+                    data: reader.result.split(',')[1],
+                    contentType: file.type
+                }
+            };
+
+            // Submit payment
+            const response = await fetch(
+                `https://script.google.com/macros/s/${SCRIPT_ID}/exec`,
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                }
+            );
+
+            if (!response.ok) throw new Error('Payment submission failed');
             return response.json();
         }
 
-        // Utilities
+        // UI Functions
         function copyAccount() {
             navigator.clipboard.writeText('00010010016466')
-                .then(() => alert('Copied!'))
-                .catch(() => alert('Copy failed'));
+                .then(() => alert('Account number copied!'))
+                .catch(() => alert('Copy failed - please select manually'));
         }
 
         function showError(message) {
             const errorEl = document.getElementById('error');
             errorEl.textContent = message;
             errorEl.style.display = 'block';
-        }
-
-        function disableForm(state) {
-            document.getElementById('submit-btn').disabled = state;
+            window.scrollTo(0, 0);
         }
 
         function showSuccess(result) {
-            alert(`Payment confirmed! Receipt: ${result.url}`);
-            window.location.reload();
+            const successEl = document.getElementById('success');
+            successEl.innerHTML = `
+                Payment confirmed!<br>
+                <a href="${result.url}" target="_blank">View Receipt</a> | 
+                <a href="https://wa.me/${result.branchPhone}?text=${encodeURIComponent(`Payment confirmed for order ${result.orderNumber}`)}" target="_blank">
+                    Send WhatsApp Confirmation
+                </a>
+            `;
+            successEl.style.display = 'block';
+        }
+
+        function showLoading() {
+            document.getElementById('submit-btn').textContent = 'Processing...';
+        }
+
+        function hideLoading() {
+            document.getElementById('submit-btn').textContent = 'Confirm Payment';
         }
     </script>
 </body>
