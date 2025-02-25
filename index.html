@@ -1,13 +1,15 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Payment Gateway</title>
+    <title>CAZ Payment Gateway</title>
     <style>
         :root {
             --gold: #D4AF37;
             --white: #FFFFFF;
             --text-dark: #333333;
+            --error: #B8860B;
         }
 
         * {
@@ -20,7 +22,7 @@
             font-family: Arial, sans-serif;
             background: var(--white);
             color: var(--text-dark);
-            line-height: 1.4;
+            line-height: 1.5;
         }
 
         /* Loading Spinner */
@@ -28,7 +30,13 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.9);
+            z-index: 1000;
         }
 
         .spinner {
@@ -51,10 +59,13 @@
             max-width: 600px;
             margin: 0 auto;
             display: none;
+            opacity: 0;
+            transition: opacity 0.3s ease;
         }
 
-        .visible {
-            display: block !important;
+        .container.visible {
+            display: block;
+            opacity: 1;
         }
 
         /* Header */
@@ -62,19 +73,21 @@
             background: var(--gold);
             padding: 15px;
             text-align: center;
+            position: sticky;
+            top: 0;
         }
 
         /* Content */
         .content {
-            padding: 15px;
+            padding: 20px;
         }
 
         /* Error Container */
         #errorContainer {
-            color: #B8860B;
+            display: none;
+            color: var(--error);
             padding: 20px;
             text-align: center;
-            display: none;
         }
 
         /* Form Elements */
@@ -82,7 +95,7 @@
             display: flex;
             flex-direction: column;
             gap: 10px;
-            margin: 15px 0;
+            margin: 20px 0;
         }
 
         #accNum {
@@ -103,6 +116,11 @@
             cursor: pointer;
             width: 100%;
             font-size: 16px;
+            transition: opacity 0.2s;
+        }
+
+        .copy-btn:hover, input[type="submit"]:hover {
+            opacity: 0.9;
         }
 
         input[type="file"] {
@@ -201,15 +219,6 @@
     </div>
 
     <script>
-        function loadOrder() {
-  const urlParams = new URLSearchParams(window.location.search);
-  let orderNumber = urlParams.get('orderNumber');
-
-  // Validate order number format
-  if (!orderNumber || !/^[A-Z0-9]{8,15}$/i.test(orderNumber)) {
-    showError('Invalid order number format');
-    return;
-  }
         const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyttn-Eif2Ff_GnbHr9tlfd8Kkld_QiSq7ivSKaOMixQPaNSgzXNI48-lv7rBK52f8W/exec";
         let currentOrder = null;
         let timeoutId;
@@ -233,6 +242,7 @@
 
         // 2. Order Data Handler
         function handleOrderData(response) {
+            console.log('Server Response:', response);
             clearTimeout(timeoutId);
             const loader = document.getElementById('loader');
             
@@ -241,18 +251,22 @@
                 return;
             }
 
-            currentOrder = response;
-            document.getElementById('orderNumber').textContent = response.orderNumber;
-            document.getElementById('code').textContent = response.code;
-            document.getElementById('name').textContent = response.name;
-            document.getElementById('price').textContent = response.price;
-            document.getElementById('branchPhone').value = response.branchPhone;
-            
-            loader.style.display = 'none';
-            document.getElementById('mainContainer').style.display = 'block';
+            try {
+                currentOrder = response;
+                document.getElementById('orderNumber').textContent = response.orderNumber;
+                document.getElementById('code').textContent = response.code || 'N/A';
+                document.getElementById('name').textContent = response.name || 'N/A';
+                document.getElementById('price').textContent = response.price || '0.00';
+                document.getElementById('branchPhone').value = response.branchPhone || '6737187776';
+                
+                loader.style.display = 'none';
+                document.getElementById('mainContainer').classList.add('visible');
+            } catch (error) {
+                showError('Failed to display order details');
+            }
         }
 
-        // 3. Payment Submission
+        // 3. Payment Handler
         async function handlePaymentSubmit(e) {
             e.preventDefault();
             const fileInput = document.getElementById('paymentForm').uploadFile;
@@ -263,8 +277,8 @@
             }
 
             // Show processing screen
-            document.getElementById('mainContainer').style.display = 'none';
-            document.getElementById('processingContainer').style.display = 'block';
+            document.getElementById('mainContainer').classList.remove('visible');
+            document.getElementById('processingContainer').classList.add('visible');
 
             try {
                 const file = fileInput.files[0];
@@ -287,8 +301,8 @@
 
                 showConfirmation(result);
             } catch (error) {
-                document.getElementById('mainContainer').style.display = 'block';
-                document.getElementById('processingContainer').style.display = 'none';
+                document.getElementById('mainContainer').classList.add('visible');
+                document.getElementById('processingContainer').classList.remove('visible');
                 alert(`Payment Failed: ${error.message}`);
             }
         }
@@ -311,7 +325,7 @@ Name: ${data.name}
 Price: $${data.price}
 Receipt: ${data.url}`;
 
-            document.getElementById('processingContainer').style.display = 'none';
+            document.getElementById('processingContainer').classList.remove('visible');
             document.getElementById('confirmationContent').innerHTML = `
                 <p><strong>Order Number:</strong> ${data.orderNumber}</p>
                 <p><strong>Code:</strong> ${data.code}</p>
@@ -323,22 +337,29 @@ Receipt: ${data.url}`;
                     Confirm via WhatsApp
                 </button>
             `;
-            document.getElementById('confirmationContainer').style.display = 'block';
+            document.getElementById('confirmationContainer').classList.add('visible');
         }
 
         function showError(message) {
             clearTimeout(timeoutId);
-            document.getElementById('loader').style.display = 'none';
-            document.getElementById('errorContainer').innerHTML = `
+            const loader = document.getElementById('loader');
+            const errorContainer = document.getElementById('errorContainer');
+            
+            loader.style.display = 'none';
+            errorContainer.innerHTML = `
                 <h2>⚠️ Error</h2>
                 <p>${message}</p>
                 <p>Please contact support with your order number</p>
             `;
-            document.getElementById('errorContainer').style.display = 'block';
+            errorContainer.classList.add('visible');
         }
 
         // 5. Initialization
         document.addEventListener('DOMContentLoaded', () => {
+            // Show loader immediately
+            document.getElementById('loader').style.display = 'flex';
+            
+            // Get order number from URL
             const urlParams = new URLSearchParams(window.location.search);
             let orderNumber = urlParams.get('orderNumber') || '';
             orderNumber = orderNumber.toUpperCase().trim();
@@ -348,15 +369,16 @@ Receipt: ${data.url}`;
                 return;
             }
 
-            // Load order data
+            // Setup form submission
             document.getElementById('paymentForm').addEventListener('submit', handlePaymentSubmit);
-            
+
+            // Load order data
             const script = document.createElement('script');
             script.src = `${SCRIPT_URL}?orderNumber=${encodeURIComponent(orderNumber)}&callback=handleOrderData`;
             script.onerror = () => showError('Failed to connect to server');
             document.head.appendChild(script);
 
-            // 30-second timeout
+            // Set 30-second timeout
             timeoutId = setTimeout(() => {
                 showError('Server is taking longer than expected. Please try again.');
             }, 30000);
