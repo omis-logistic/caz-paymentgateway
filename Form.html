@@ -50,8 +50,8 @@
   </div>
 
 <script>
-  // Replace with your Apps Script deployment URL
-  const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxLQ7KqnOag2WUydxpIJcDcve9tVUbhF2-VeKG6j9cdZaBwRR1SUmVZQViB7Wyv_dtT/exec';
+  // Replace with your deployed Apps Script URL
+  const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwPCU5GknuevNCYWD080EiT7G5pNp5vJj_vf9ibXyk-VfivPw05hugHiIpZ2UJXe2bR/exec';
 
   // Initialize on page load
   document.addEventListener('DOMContentLoaded', async () => {
@@ -60,43 +60,42 @@
       const orderNumber = urlParams.get('orderNumber');
 
       if (!orderNumber) {
-        showError('Order number required in URL (e.g., ?orderNumber=CZ123)');
+        showError('Missing order number in URL parameters');
         return;
       }
+
+      // First make preflight check
+      await fetch(`${SCRIPT_URL}?action=preflight`, {
+        method: 'OPTIONS'
+      });
 
       const orderData = await fetchOrderData(orderNumber);
       populateForm(orderData);
     } catch (error) {
-      showError(error.message);
+      showError(`Initialization failed: ${error.message}`);
     }
   });
 
-  // Fetch order data from backend
   async function fetchOrderData(orderNumber) {
     try {
       const response = await fetch(
-        `${SCRIPT_URL}?action=getOrder&orderNumber=${encodeURIComponent(orderNumber)}`,
-        {
-          method: 'GET',
-          redirect: 'follow'
-        }
+        `${SCRIPT_URL}?action=getOrder&orderNumber=${encodeURIComponent(orderNumber)}`
       );
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to load order data');
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Server response error');
       }
 
       return await response.json();
     } catch (error) {
-      throw new Error(`Server connection failed: ${error.message}`);
+      throw new Error(`Failed to load order: ${error.message}`);
     }
   }
 
-  // Populate form fields
   function populateForm(data) {
-    if (!data || data.status === 'error') {
-      throw new Error(data?.message || 'Invalid order data');
+    if (!data || data.status !== 'success') {
+      throw new Error('Invalid order data format');
     }
 
     document.getElementById('orderNumber').textContent = data.data.orderNumber;
@@ -106,7 +105,6 @@
     document.getElementById('branchPhone').value = data.data.branchPhone;
   }
 
-  // File upload handler
   document.getElementById('paymentForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const fileInput = e.target.uploadFile;
@@ -132,19 +130,21 @@
         }
       };
 
+      // Preflight check
+      await fetch(SCRIPT_URL, { method: 'OPTIONS' });
+
       const response = await fetch(SCRIPT_URL, {
         method: 'POST',
         body: JSON.stringify(formData),
-        headers: { 'Content-Type': 'application/json' },
-        redirect: 'follow'
+        headers: { 'Content-Type': 'application/json' }
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Payment submission failed');
+      const result = await response.json();
+      
+      if (result.status !== 'success') {
+        throw new Error(result.message || 'Payment processing failed');
       }
 
-      const result = await response.json();
       showSuccess(result.data);
     } catch (error) {
       showError(`Payment failed: ${error.message}`);
@@ -155,16 +155,16 @@
   async function toBase64(file) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.readAsDataURL(file);
       reader.onload = () => resolve(reader.result.split(',')[1]);
       reader.onerror = error => reject(error);
+      reader.readAsDataURL(file);
     });
   }
 
   function copyToClipboard() {
     navigator.clipboard.writeText('00010010016466')
       .then(() => alert('Account number copied!'))
-      .catch(() => alert('Copy failed - please select text manually'));
+      .catch(() => alert('Copy failed - please select manually'));
   }
 
   // UI States
@@ -175,13 +175,13 @@
           <h1>Processing Payment</h1>
         </div>
         <div class="content">
-          <p>Please wait while we verify your payment...</p>
+          <p>Please wait while we verify your transaction...</p>
         </div>
       </div>`;
   }
 
   function showSuccess(data) {
-    const whatsappMessage = `Payment Confirmation
+    const message = `Payment Confirmation
 Order Number: ${data.orderNumber}
 Code: ${data.code}
 Name: ${data.name}
@@ -196,7 +196,7 @@ Receipt: ${data.receiptUrl}`;
         <div class="content">
           <p><strong>Order Number:</strong> ${data.orderNumber}</p>
           <p><strong>Receipt:</strong> <a href="${data.receiptUrl}" target="_blank">View Proof</a></p>
-          <button onclick="window.open('https://wa.me/${data.branchPhone}?text=${encodeURIComponent(whatsappMessage)}', '_blank')" 
+          <button onclick="window.open('https://wa.me/${data.branchPhone}?text=${encodeURIComponent(message)}', '_blank')" 
             class="copy-btn">
             Confirm via WhatsApp
           </button>
