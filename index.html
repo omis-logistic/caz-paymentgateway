@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<style>
+    <style>
     :root {
         --gold: #D4AF37;
         --white: #FFFFFF;
@@ -25,7 +25,7 @@
         line-height: 1.4;
     }
 
-    /* Loading Spinner Styles */
+    /* Loading Spinner */
     #loader {
         display: flex;
         justify-content: center;
@@ -47,13 +47,19 @@
         100% { transform: rotate(360deg); }
     }
 
+    /* Containers */
     .container {
         width: 100%;
         max-width: 600px;
         margin: 0 auto;
-        display: none; /* Hidden initially */
+        display: none;
     }
 
+    .visible {
+        display: block !important;
+    }
+
+    /* Header */
     .header {
         background: var(--gold);
         padding: 15px;
@@ -62,10 +68,12 @@
         top: 0;
     }
 
+    /* Content */
     .content {
         padding: 15px;
     }
 
+    /* Error Handling */
     #errorContainer {
         display: none;
         color: #B8860B;
@@ -73,6 +81,7 @@
         text-align: center;
     }
 
+    /* Form Elements */
     .account-row {
         display: block;
         width: 100%;
@@ -101,6 +110,7 @@
         border-radius: 4px;
         margin: 10px 0;
         font-size: 16px;
+        cursor: pointer;
     }
 
     input[type="file"] {
@@ -113,6 +123,7 @@
         border-radius: 4px;
     }
 
+    /* Desktop Styles */
     @media (min-width: 768px) {
         body {
             padding: 20px;
@@ -141,12 +152,6 @@
             min-width: 160px;
         }
     }
-        #processingContainer, #confirmationContainer {
-        display: none;
-    }
-    .visible {
-        display: block !important;
-    }
 </style>
 </head>
 <body>
@@ -154,13 +159,13 @@
         <div class="spinner"></div>
     </div>
 
-    <div id="errorContainer"></div>
+    <div id="errorContainer" class="container" style="display: none;"></div>
 
-    <div class="container" id="mainContainer">
+    <!-- Main Form Container -->
+    <div id="mainContainer" class="container">
         <div class="header">
             <h1>Payment Gateway</h1>
         </div>
-        
         <div class="content">
             <p><strong>Order Number:</strong> <span id="orderNumber"></span></p>
             <p><strong>Code:</strong> <span id="code"></span></p>
@@ -185,164 +190,173 @@
         </div>
     </div>
 
-<script>
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzYDlCxrfhCvhBZDowNzwy3aRTpUNc6R_V9eMWXRnjpIpnCAVSBuezUiVbiv_A6tQiS/exec";
-    let currentOrderData = null;
+    <!-- Processing Container -->
+    <div id="processingContainer" class="container" style="display: none;">
+        <div class="header">
+            <h1>Processing Payment</h1>
+        </div>
+        <div class="content">
+            <p>Please wait while we process your payment...</p>
+        </div>
+    </div>
 
-    // Handle order data response
-    function handleOrderData(response) {
-        const loader = document.getElementById('loader');
-        const mainContainer = document.getElementById('mainContainer');
-        const errorContainer = document.getElementById('errorContainer');
+    <!-- Confirmation Container -->
+    <div id="confirmationContainer" class="container" style="display: none;">
+        <div class="header">
+            <h1>Payment Confirmed</h1>
+        </div>
+        <div class="content" id="confirmationContent"></div>
+    </div>
 
-        loader.style.display = 'none';
+    <script>
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzYDlCxrfhCvhBZDowNzwy3aRTpUNc6R_V9eMWXRnjpIpnCAVSBuezUiVbiv_A6tQiS/exec";
 
-        if (response.error) {
-            errorContainer.innerHTML = `
-                <h2>⚠️ Payment Error</h2>
-                <p>${response.error}</p>
-                <p>Please contact support with your order number</p>
-            `;
-            errorContainer.style.display = 'block';
-            return;
-        }
-
-        currentOrderData = response.data;
-        
-        // Populate all fields
-        document.getElementById('orderNumber').textContent = currentOrderData.orderNumber;
-        document.getElementById('code').textContent = currentOrderData.code;
-        document.getElementById('name').textContent = currentOrderData.name;
-        document.getElementById('price').textContent = currentOrderData.price;
-        document.getElementById('branchPhone').value = currentOrderData.branchPhone;
-
-        mainContainer.style.display = 'block';
-    }
-
-    // Clipboard function (fixed)
-    function copyToClipboard() {
-        const accNum = document.getElementById('accNum');
-        const textArea = document.createElement('textarea');
-        textArea.value = accNum.innerText;
-        document.body.appendChild(textArea);
-        textArea.select();
-        
-        try {
-            document.execCommand('copy');
-            alert('Account number copied to clipboard!');
-        } catch (err) {
-            alert('Failed to copy! Please manually select the text.');
-        }
-        document.body.removeChild(textArea);
-    }
-
-    // Handle form submission
-    async function handlePaymentSubmit(e) {
-        e.preventDefault();
-        const form = e.target;
-        const file = form.uploadFile.files[0];
-        
-        if (!file) {
-            alert('Please select a payment screenshot first!');
-            return;
-        }
-
-        // Show processing state
-        document.getElementById('mainContainer').style.display = 'none';
-        document.getElementById('processingContainer').style.display = 'block';
-
-        try {
-            // Read file data
-            const fileData = await new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = () => resolve(reader.result);
-                reader.onerror = reject;
-                reader.readAsDataURL(file);
-            });
-
-            // Prepare payload
-            const payload = {
-                orderNumber: currentOrderData.orderNumber,
-                code: currentOrderData.code,
-                name: currentOrderData.name,
-                price: currentOrderData.price,
-                branchPhone: currentOrderData.branchPhone,
-                upload: {
-                    name: file.name,
-                    data: fileData.split(',')[1],
-                    contentType: file.type
-                }
-            };
-
-            // Submit payment
-            const response = await fetch(SCRIPT_URL, {
-                method: 'POST',
-                body: JSON.stringify(payload),
-                headers: { 'Content-Type': 'application/json' }
-            });
+        // 1. Clipboard Function (Fixed)
+        function copyToClipboard() {
+            const accNum = document.getElementById('accNum');
+            const tempInput = document.createElement('input');
+            tempInput.value = accNum.innerText;
+            document.body.appendChild(tempInput);
+            tempInput.select();
             
-            const result = await response.json();
+            try {
+                document.execCommand('copy');
+                alert('Account number copied to clipboard!');
+            } catch (err) {
+                alert('Failed to copy! Please manually select the text.');
+            }
+            document.body.removeChild(tempInput);
+        }
+
+        // 2. Order Data Handler
+        function handleOrderData(response) {
+            const loader = document.getElementById('loader');
+            const mainContainer = document.getElementById('mainContainer');
             
-            if (!result.success) {
-                throw new Error(result.error);
+            loader.style.display = 'none';
+
+            if (response.error) {
+                document.getElementById('errorContainer').innerHTML = `
+                    <h2>⚠️ Error</h2>
+                    <p>${response.error}</p>
+                    <p>Please check your order number</p>
+                `;
+                document.getElementById('errorContainer').style.display = 'block';
+                return;
             }
 
-            // Show confirmation
-            const message = `Payment Confirmation
+            // Populate data
+            document.getElementById('orderNumber').textContent = response.data.orderNumber;
+            document.getElementById('code').textContent = response.data.code;
+            document.getElementById('name').textContent = response.data.name;
+            document.getElementById('price').textContent = response.data.price;
+            document.getElementById('branchPhone').value = response.data.branchPhone;
+            
+            mainContainer.style.display = 'block';
+        }
+
+        // 3. Payment Handler (Fixed Transitions)
+        async function handlePaymentSubmit(e) {
+            e.preventDefault();
+            const fileInput = e.target.uploadFile;
+            
+            if (!fileInput.files[0]) {
+                alert('Please select a payment screenshot!');
+                return;
+            }
+
+            // Show processing screen
+            document.getElementById('mainContainer').style.display = 'none';
+            document.getElementById('processingContainer').style.display = 'block';
+
+            try {
+                // Read file
+                const file = fileInput.files[0];
+                const fileData = await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(file);
+                });
+
+                // Prepare payload
+                const payload = {
+                    orderNumber: document.getElementById('orderNumber').textContent,
+                    code: document.getElementById('code').textContent,
+                    name: document.getElementById('name').textContent,
+                    price: document.getElementById('price').textContent,
+                    branchPhone: document.getElementById('branchPhone').value,
+                    upload: {
+                        name: file.name,
+                        data: fileData.split(',')[1],
+                        contentType: file.type
+                    }
+                };
+
+                // Submit payment
+                const response = await fetch(SCRIPT_URL, {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+                
+                const result = await response.json();
+                
+                if (!result.success) throw new Error(result.error);
+
+                // Show confirmation
+                document.getElementById('processingContainer').style.display = 'none';
+                const confirmationContent = document.getElementById('confirmationContent');
+                const message = `Payment Confirmation
 Order Number: ${result.orderNumber}
 Code: ${result.code}
 Name: ${result.name}
 Price: $${result.price}
 Screenshot: ${result.url}`;
 
-            document.getElementById('processingContainer').style.display = 'none';
-            const confirmationContent = document.getElementById('confirmationContent');
-            confirmationContent.innerHTML = `
-                <p><strong>Order Number:</strong> ${result.orderNumber}</p>
-                <p><strong>Code:</strong> ${result.code}</p>
-                <p><strong>Name:</strong> ${result.name}</p>
-                <p><strong>Price:</strong> $${result.price}</p>
-                <p><strong>Screenshot:</strong> <a href="${result.url}" target="_blank">View Receipt</a></p>
-                <button onclick="window.open('https://wa.me/${result.branchPhone}?text=${encodeURIComponent(message)}', '_blank')" 
-                    class="copy-btn">
-                    Send via WhatsApp
-                </button>
-            `;
-            document.getElementById('confirmationContainer').style.display = 'block';
+                confirmationContent.innerHTML = `
+                    <p><strong>Order Number:</strong> ${result.orderNumber}</p>
+                    <p><strong>Code:</strong> ${result.code}</p>
+                    <p><strong>Name:</strong> ${result.name}</p>
+                    <p><strong>Price:</strong> $${result.price}</p>
+                    <p><strong>Receipt:</strong> <a href="${result.url}" target="_blank">View</a></p>
+                    <button onclick="window.open('https://wa.me/${result.branchPhone}?text=${encodeURIComponent(message)}')" 
+                        class="copy-btn">
+                        Confirm via WhatsApp
+                    </button>
+                `;
+                document.getElementById('confirmationContainer').style.display = 'block';
 
-        } catch (error) {
-            document.getElementById('mainContainer').style.display = 'block';
-            document.getElementById('processingContainer').style.display = 'none';
-            alert(`Payment Failed: ${error.message}`);
-        }
-    }
-
-    // Initialize
-    document.addEventListener('DOMContentLoaded', () => {
-        const urlParams = new URLSearchParams(window.location.search);
-        const orderNumber = urlParams.get('orderNumber');
-
-        if (!orderNumber) {
-            showError('Order number is required');
-            return;
+            } catch (error) {
+                document.getElementById('mainContainer').style.display = 'block';
+                document.getElementById('processingContainer').style.display = 'none';
+                alert(`Payment Failed: ${error.message}`);
+            }
         }
 
-        document.getElementById('paymentForm').addEventListener('submit', handlePaymentSubmit);
-        
-        // Load order details
-        const script = document.createElement('script');
-        script.src = `${SCRIPT_URL}?orderNumber=${encodeURIComponent(orderNumber)}&callback=handleOrderData`;
-        document.head.appendChild(script);
-    });
+        // 4. Initialization (Fixed)
+        document.addEventListener('DOMContentLoaded', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const orderNumber = urlParams.get('orderNumber');
 
-    function showError(message) {
-        document.getElementById('loader').style.display = 'none';
-        document.getElementById('errorContainer').innerHTML = `
-            <h2>⚠️ Error</h2>
-            <p>${message}</p>
-        `;
-        document.getElementById('errorContainer').style.display = 'block';
-    }
-</script>
+            if (!orderNumber) {
+                document.getElementById('loader').style.display = 'none';
+                document.getElementById('errorContainer').innerHTML = `
+                    <h2>⚠️ Error</h2>
+                    <p>Order number is required in URL parameters</p>
+                    <p>Example: ?orderNumber=CZ1234</p>
+                `;
+                document.getElementById('errorContainer').style.display = 'block';
+                return;
+            }
+
+            // Load order data
+            const script = document.createElement('script');
+            script.src = `${SCRIPT_URL}?orderNumber=${encodeURIComponent(orderNumber)}&callback=handleOrderData`;
+            document.head.appendChild(script);
+
+            // Setup form handler
+            document.getElementById('paymentForm').addEventListener('submit', handlePaymentSubmit);
+        });
+    </script>
 </body>
 </html>
