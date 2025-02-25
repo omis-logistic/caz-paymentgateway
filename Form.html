@@ -3,133 +3,123 @@
   <head>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
-        /* Loading Screen */
-        #loading {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: white;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 9999;
-            flex-direction: column;
-        }
+      :root {
+        --gold: #D4AF37;
+        --white: #FFFFFF;
+        --text-dark: #333333;
+      }
 
-        .loading-spinner {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #D4AF37;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-            margin-bottom: 20px;
-        }
+      * {
+        box-sizing: border-box;
+        -webkit-text-size-adjust: none;
+        -webkit-overflow-scrolling: touch;
+      }
 
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
+      body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+        background: var(--white);
+        color: var(--text-dark);
+        font-size: 14px;
+        line-height: 1.4;
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
+      }
 
-        /* Main Styles */
-        :root {
-            --gold: #D4AF37;
-            --white: #FFFFFF;
-            --text-dark: #333333;
-        }
+      .container {
+        width: 100%;
+        max-width: 600px;
+        margin: 0 auto;
+        flex: 1;
+      }
 
-        * {
-            box-sizing: border-box;
-            -webkit-text-size-adjust: none;
-        }
+      .header {
+        background: var(--gold);
+        padding: 15px;
+        text-align: center;
+        position: sticky;
+        top: 0;
+        width: 100%;
+      }
 
+      .content {
+        padding: 15px;
+        width: 100%;
+      }
+
+      .account-row {
+        display: block;
+        width: 100%;
+      }
+
+      #accNum {
+        display: block;
+        width: 100%;
+        font-size: 16px;
+        word-break: break-word;
+        text-align: center;
+        margin: 10px 0;
+        padding: 12px;
+        background: #FFFBE6;
+        border: 1px solid var(--gold);
+        border-radius: 4px;
+      }
+
+      .copy-btn, input[type="submit"] {
+        display: block;
+        width: 100%;
+        background: var(--gold);
+        color: white;
+        border: none;
+        padding: 12px;
+        border-radius: 4px;
+        margin: 10px 0;
+        font-size: 16px;
+      }
+
+      input[type="file"] {
+        display: block;
+        width: 100%;
+        padding: 12px;
+        margin: 15px 0;
+        border: 2px dashed var(--gold);
+        background: #FFFBE6;
+        border-radius: 4px;
+      }
+
+      @media (min-width: 768px) {
         body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-            background: var(--white);
-            color: var(--text-dark);
-            font-size: 14px;
-            line-height: 1.4;
+          padding: 20px;
+          background: #f0f0f0;
+          font-size: 16px;
         }
 
         .container {
-            max-width: 600px;
-            margin: 0 auto;
-            display: none; /* Hidden initially */
-        }
-
-        .header {
-            background: var(--gold);
-            padding: 15px;
-            text-align: center;
-            position: sticky;
-            top: 0;
-        }
-
-        .content {
-            padding: 20px;
+          border-radius: 10px;
+          box-shadow: 0 2px 15px rgba(0,0,0,0.1);
         }
 
         .account-row {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 15px;
-            margin: 20px 0;
+          display: flex;
+          gap: 15px;
+          align-items: center;
         }
 
         #accNum {
-            flex: 1;
-            padding: 12px;
-            background: #FFFBE6;
-            border: 1px solid var(--gold);
-            border-radius: 4px;
-            word-break: break-all;
+          text-align: left;
+          margin: 0;
         }
 
-        .copy-btn, input[type="submit"] {
-            background: var(--gold);
-            color: white;
-            border: none;
-            padding: 12px 20px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 16px;
-            width: 100%;
+        .copy-btn {
+          width: auto;
+          min-width: 160px;
         }
-
-        input[type="file"] {
-            width: 100%;
-            padding: 12px;
-            margin: 20px 0;
-            border: 2px dashed var(--gold);
-            background: #FFFBE6;
-            border-radius: 4px;
-        }
-
-        @media (min-width: 768px) {
-            body {
-                padding: 20px;
-                background: #f0f0f0;
-            }
-            .container {
-                border-radius: 10px;
-                box-shadow: 0 2px 15px rgba(0,0,0,0.1);
-            }
-            .copy-btn {
-                width: auto;
-            }
-        }
+      }
     </style>
-</head>
-<body>
-    <div id="loading">
-        <div class="loading-spinner"></div>
-        <p>Loading Order Details...</p>
-    </div>
-
+  </head>
+  <body>
     <div class="container">
       <div class="header">
         <h1>Payment Gateway</h1>
@@ -166,7 +156,7 @@
 
     <script>
       // Replace with your deployed Apps Script URL
-      const SCRIPT_URL = 'https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec';
+      const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwDxEfFwuREacfQEqY7y2h1JGGvlWtQJzoVlY8hYgisjAPcRHVg72z3Blxe1d0yxSi_/exec';
 
       // Initialize on load
       (async function init() {
