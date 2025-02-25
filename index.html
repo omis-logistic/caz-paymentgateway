@@ -141,6 +141,12 @@
             min-width: 160px;
         }
     }
+        #processingContainer, #confirmationContainer {
+        display: none;
+    }
+    .visible {
+        display: block !important;
+    }
 </style>
 </head>
 <body>
@@ -180,150 +186,163 @@
     </div>
 
 <script>
-  const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzYDlCxrfhCvhBZDowNzwy3aRTpUNc6R_V9eMWXRnjpIpnCAVSBuezUiVbiv_A6tQiS/exec";
-  let orderData = null;
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzYDlCxrfhCvhBZDowNzwy3aRTpUNc6R_V9eMWXRnjpIpnCAVSBuezUiVbiv_A6tQiS/exec";
+    let currentOrderData = null;
 
-  function handleOrderResponse(response) {
-    const loader = document.getElementById('loader');
-    const mainContainer = document.getElementById('mainContainer');
-    
-    loader.style.display = 'none';
-    
-    if (response.error) {
-      showError(response.error);
-      return;
+    // Handle order data response
+    function handleOrderData(response) {
+        const loader = document.getElementById('loader');
+        const mainContainer = document.getElementById('mainContainer');
+        const errorContainer = document.getElementById('errorContainer');
+
+        loader.style.display = 'none';
+
+        if (response.error) {
+            errorContainer.innerHTML = `
+                <h2>⚠️ Payment Error</h2>
+                <p>${response.error}</p>
+                <p>Please contact support with your order number</p>
+            `;
+            errorContainer.style.display = 'block';
+            return;
+        }
+
+        currentOrderData = response.data;
+        
+        // Populate all fields
+        document.getElementById('orderNumber').textContent = currentOrderData.orderNumber;
+        document.getElementById('code').textContent = currentOrderData.code;
+        document.getElementById('name').textContent = currentOrderData.name;
+        document.getElementById('price').textContent = currentOrderData.price;
+        document.getElementById('branchPhone').value = currentOrderData.branchPhone;
+
+        mainContainer.style.display = 'block';
     }
 
-    orderData = response;
-    document.getElementById('orderNumber').textContent = response.orderNumber;
-    document.getElementById('code').textContent = response.code;
-    document.getElementById('name').textContent = response.name;
-    document.getElementById('price').textContent = response.price;
-    document.getElementById('branchPhone').value = response.branchPhone;
-    mainContainer.style.display = 'block';
-  }
-
-  function loadOrder() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const orderNumber = urlParams.get('orderNumber');
-    
-    if (!orderNumber) {
-      showError('Order number is required');
-      return;
+    // Clipboard function (fixed)
+    function copyToClipboard() {
+        const accNum = document.getElementById('accNum');
+        const textArea = document.createElement('textarea');
+        textArea.value = accNum.innerText;
+        document.body.appendChild(textArea);
+        textArea.select();
+        
+        try {
+            document.execCommand('copy');
+            alert('Account number copied to clipboard!');
+        } catch (err) {
+            alert('Failed to copy! Please manually select the text.');
+        }
+        document.body.removeChild(textArea);
     }
 
-    const script = document.createElement('script');
-    script.src = `${SCRIPT_URL}?orderNumber=${encodeURIComponent(orderNumber)}&callback=handleOrderResponse`;
-    script.onerror = () => showError('Failed to load order details');
-    document.head.appendChild(script);
-    
-    // Timeout after 10 seconds
-    setTimeout(() => {
-      if (!orderData) showError('Server response timed out');
-    }, 10000);
-  }
+    // Handle form submission
+    async function handlePaymentSubmit(e) {
+        e.preventDefault();
+        const form = e.target;
+        const file = form.uploadFile.files[0];
+        
+        if (!file) {
+            alert('Please select a payment screenshot first!');
+            return;
+        }
 
-  async function handlePayment(e) {
-    e.preventDefault();
-    const file = e.target.uploadFile.files[0];
-    
-    if (!file) {
-      alert('Please select a payment screenshot first!');
-      return;
+        // Show processing state
+        document.getElementById('mainContainer').style.display = 'none';
+        document.getElementById('processingContainer').style.display = 'block';
+
+        try {
+            // Read file data
+            const fileData = await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+
+            // Prepare payload
+            const payload = {
+                orderNumber: currentOrderData.orderNumber,
+                code: currentOrderData.code,
+                name: currentOrderData.name,
+                price: currentOrderData.price,
+                branchPhone: currentOrderData.branchPhone,
+                upload: {
+                    name: file.name,
+                    data: fileData.split(',')[1],
+                    contentType: file.type
+                }
+            };
+
+            // Submit payment
+            const response = await fetch(SCRIPT_URL, {
+                method: 'POST',
+                body: JSON.stringify(payload),
+                headers: { 'Content-Type': 'application/json' }
+            });
+            
+            const result = await response.json();
+            
+            if (!result.success) {
+                throw new Error(result.error);
+            }
+
+            // Show confirmation
+            const message = `Payment Confirmation
+Order Number: ${result.orderNumber}
+Code: ${result.code}
+Name: ${result.name}
+Price: $${result.price}
+Screenshot: ${result.url}`;
+
+            document.getElementById('processingContainer').style.display = 'none';
+            const confirmationContent = document.getElementById('confirmationContent');
+            confirmationContent.innerHTML = `
+                <p><strong>Order Number:</strong> ${result.orderNumber}</p>
+                <p><strong>Code:</strong> ${result.code}</p>
+                <p><strong>Name:</strong> ${result.name}</p>
+                <p><strong>Price:</strong> $${result.price}</p>
+                <p><strong>Screenshot:</strong> <a href="${result.url}" target="_blank">View Receipt</a></p>
+                <button onclick="window.open('https://wa.me/${result.branchPhone}?text=${encodeURIComponent(message)}', '_blank')" 
+                    class="copy-btn">
+                    Send via WhatsApp
+                </button>
+            `;
+            document.getElementById('confirmationContainer').style.display = 'block';
+
+        } catch (error) {
+            document.getElementById('mainContainer').style.display = 'block';
+            document.getElementById('processingContainer').style.display = 'none';
+            alert(`Payment Failed: ${error.message}`);
+        }
     }
 
-    showLoading();
+    // Initialize
+    document.addEventListener('DOMContentLoaded', () => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const orderNumber = urlParams.get('orderNumber');
 
-    try {
-      const reader = new FileReader();
-      const fileData = await new Promise((resolve, reject) => {
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
+        if (!orderNumber) {
+            showError('Order number is required');
+            return;
+        }
 
-      const response = await fetch(SCRIPT_URL, {
-        method: 'POST',
-        body: JSON.stringify({
-          orderNumber: orderData.orderNumber,
-          code: orderData.code,
-          name: orderData.name,
-          price: orderData.price,
-          branchPhone: orderData.branchPhone,
-          upload: {
-            name: file.name,
-            data: fileData.split(',')[1],
-            contentType: file.type
-          }
-        })
-      });
+        document.getElementById('paymentForm').addEventListener('submit', handlePaymentSubmit);
+        
+        // Load order details
+        const script = document.createElement('script');
+        script.src = `${SCRIPT_URL}?orderNumber=${encodeURIComponent(orderNumber)}&callback=handleOrderData`;
+        document.head.appendChild(script);
+    });
 
-      const result = await response.json();
-      
-      if (!result.success) throw new Error(result.error);
-      showConfirmation(result);
-      
-    } catch (error) {
-      showError(error.message);
+    function showError(message) {
+        document.getElementById('loader').style.display = 'none';
+        document.getElementById('errorContainer').innerHTML = `
+            <h2>⚠️ Error</h2>
+            <p>${message}</p>
+        `;
+        document.getElementById('errorContainer').style.display = 'block';
     }
-  }
-
-  function showLoading() {
-    document.body.innerHTML = `
-      <div class="container">
-        <div class="header">
-          <h1>Processing Payment</h1>
-        </div>
-        <div class="content">
-          <p>Please wait while we process your payment...</p>
-        </div>
-      </div>
-    `;
-  }
-
-  function showConfirmation(data) {
-    const message = `Payment Confirmation
-Order Number: ${data.orderNumber}
-Code: ${data.code}
-Name: ${data.name}
-Price: $${data.price}
-Screenshot: ${data.url}`;
-
-    document.body.innerHTML = `
-      <div class="container">
-        <div class="header">
-          <h1>Payment Confirmed</h1>
-        </div>
-        <div class="content">
-          <p><strong>Order Number:</strong> ${data.orderNumber}</p>
-          <p><strong>Code:</strong> ${data.code}</p>
-          <p><strong>Name:</strong> ${data.name}</p>
-          <p><strong>Price:</strong> $${data.price}</p>
-          <p><strong>Screenshot:</strong> <a href="${data.url}" target="_blank">View Receipt</a></p>
-          <button onclick="window.open('https://wa.me/${data.branchPhone}?text=${encodeURIComponent(message)}', '_blank')" 
-            class="copy-btn">
-            Send via WhatsApp
-          </button>
-        </div>
-      </div>
-    `;
-  }
-
-  function showError(message) {
-    document.getElementById('loader').style.display = 'none';
-    document.getElementById('errorContainer').innerHTML = `
-      <h2>⚠️ Error</h2>
-      <p>${message}</p>
-      <p>Please try again or contact support</p>
-    `;
-    document.getElementById('errorContainer').style.display = 'block';
-  }
-
-  // Initialize
-  document.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('paymentForm').addEventListener('submit', handlePayment);
-    loadOrder();
-  });
 </script>
 </body>
 </html>
