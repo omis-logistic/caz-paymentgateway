@@ -201,6 +201,15 @@
     </div>
 
     <script>
+        function loadOrder() {
+  const urlParams = new URLSearchParams(window.location.search);
+  let orderNumber = urlParams.get('orderNumber');
+
+  // Validate order number format
+  if (!orderNumber || !/^[A-Z0-9]{8,15}$/i.test(orderNumber)) {
+    showError('Invalid order number format');
+    return;
+  }
         const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzYDlCxrfhCvhBZDowNzwy3aRTpUNc6R_V9eMWXRnjpIpnCAVSBuezUiVbiv_A6tQiS/exec";
         let currentOrder = null;
         let timeoutId;
