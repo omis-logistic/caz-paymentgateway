@@ -1,8 +1,8 @@
+<!-- index.html -->
 <!DOCTYPE html>
 <html>
-<head>
+  <head>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Payment Gateway</title>
     <style>
         /* Loading Screen */
         #loading {
@@ -124,178 +124,156 @@
             }
         }
     </style>
-</head>
-<body>
+  </head>
+  <body>
     <div id="loading">
         <div class="loading-spinner"></div>
         <p>Loading Order Details...</p>
     </div>
 
     <div class="container">
-        <div class="header">
-            <h1>Payment Gateway</h1>
+      <div class="header">
+        <h1>Payment Gateway</h1>
+      </div>
+      
+      <div class="content">
+        <p><strong>Order Number:</strong> <span id="orderNumber"></span></p>
+        <p><strong>Code:</strong> <span id="code"></span></p>
+        <p><strong>Name:</strong> <span id="name"></span></p>
+        <p><strong>Price:</strong> $<span id="price"></span></p>
+        
+        <hr>
+        
+        <h3>Payment Instructions</h3>
+        <p style="color: var(--gold); font-weight: bold;">BIBD Transfer</p>
+        <div class="account-row">
+          <span id="accNum">00010010016466</span>
+          <button class="copy-btn" onclick="copyToClipboard()">Copy Account Number</button>
         </div>
         
-        <div class="content">
-            <p><strong>Order Number:</strong> <span id="orderNumber"></span></p>
-            <p><strong>Code:</strong> <span id="code"></span></p>
-            <p><strong>Name:</strong> <span id="name"></span></p>
-            <p><strong>Price:</strong> $<span id="price"></span></p>
-            
-            <hr>
-            
-            <h3>Payment Instructions</h3>
-            <p style="color: var(--gold); font-weight: bold;">BIBD Transfer</p>
-            <div class="account-row">
-                <span id="accNum">00010010016466</span>
-                <button class="copy-btn" onclick="copyToClipboard()">Copy Account Number</button>
-            </div>
-            
-            <form id="paymentForm">
-                <input type="hidden" id="formOrderNumber" name="orderNumber">
-                <input type="hidden" id="formCode" name="code">
-                <input type="hidden" id="formName" name="name">
-                <input type="hidden" id="formPrice" name="price">
-                <input type="hidden" id="formBranchPhone" name="branchPhone">
-                
-                <p>Upload payment screenshot:</p>
-                <input type="file" name="uploadFile" accept="image/*" required>
-                <input type="submit" value="Submit Payment">
-            </form>
-        </div>
+        <form id="paymentForm">
+          <input type="hidden" id="hiddenOrderNumber" name="orderNumber">
+          <input type="hidden" id="hiddenCode" name="code">
+          <input type="hidden" id="hiddenName" name="name">
+          <input type="hidden" id="hiddenPrice" name="price">
+          <input type="hidden" id="hiddenBranchPhone" name="branchPhone">
+          
+          <p>Upload payment screenshot:</p>
+          <input type="file" name="uploadFile" accept="image/*" required>
+          <input type="submit" value="Submit Payment">
+        </form>
+      </div>
     </div>
 
     <script>
-        const scriptUrl = 'https://script.google.com/macros/s/AKfycbwDxEfFwuREacfQEqY7y2h1JGGvlWtQJzoVlY8hYgisjAPcRHVg72z3Blxe1d0yxSi_/exec'; // REPLACE WITH YOUR URL
+      // Get order number from URL parameters
+      const urlParams = new URLSearchParams(window.location.search);
+      const orderNumber = urlParams.get('orderNumber');
 
-        async function initialize() {
-            try {
-                const urlParams = new URLSearchParams(window.location.search);
-                const orderNumber = urlParams.get('orderNumber')?.trim();
-                
-                if (!orderNumber) throw new Error('Missing order number in URL');
-                
-                const response = await fetch(`${scriptUrl}?orderNumber=${encodeURIComponent(orderNumber)}`);
-                
-                if (!response.ok) throw new Error(`Server response error: ${response.status}`);
-                
-                const result = await response.json();
-                
-                if (!result.success) throw new Error(result.error || 'Failed to load order details');
-                
-                // Populate visible data
-                document.getElementById('orderNumber').textContent = orderNumber;
-                document.getElementById('code').textContent = result.data.code || 'N/A';
-                document.getElementById('name').textContent = result.data.name || 'N/A';
-                document.getElementById('price').textContent = result.data.price || '0.00';
-                
-                // Set form data
-                document.getElementById('formOrderNumber').value = orderNumber;
-                document.getElementById('formCode').value = result.data.code;
-                document.getElementById('formName').value = result.data.name;
-                document.getElementById('formPrice').value = result.data.price;
-                document.getElementById('formBranchPhone').value = result.data.branchPhone;
+      // Replace with your deployed Apps Script URL
+      const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwDxEfFwuREacfQEqY7y2h1JGGvlWtQJzoVlY8hYgisjAPcRHVg72z3Blxe1d0yxSi_/exec';
 
-                // Show content
-                document.getElementById('loading').style.display = 'none';
-                document.querySelector('.container').style.display = 'block';
-
-            } catch (error) {
-                document.getElementById('loading').innerHTML = `
-                    <div style="text-align: center; color: #B8860B;">
-                        <h2>⚠️ Loading Error</h2>
-                        <p>${error.message}</p>
-                        <p>Please check the order number or contact support</p>
-                    </div>
-                `;
-                console.error('Initialization error:', error);
-            }
+      // Fetch order data from Apps Script
+      async function loadOrderData() {
+        try {
+          const response = await fetch(`${SCRIPT_URL}?orderNumber=${orderNumber}`);
+          const data = await response.json();
+          
+          document.getElementById('orderNumber').textContent = orderNumber;
+          document.getElementById('code').textContent = data.code;
+          document.getElementById('name').textContent = data.name;
+          document.getElementById('price').textContent = data.price;
+          
+          // Set hidden values
+          document.getElementById('hiddenOrderNumber').value = orderNumber;
+          document.getElementById('hiddenCode').value = data.code;
+          document.getElementById('hiddenName').value = data.name;
+          document.getElementById('hiddenPrice').value = data.price;
+          document.getElementById('hiddenBranchPhone').value = data.branchPhone;
+          
+        } catch (error) {
+          alert('Error loading order data: ' + error.message);
         }
+      }
 
-        // Form Submission Handler
-        document.getElementById('paymentForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const formData = new FormData(e.target);
-            const file = formData.get('uploadFile');
-            
-            if (!file) {
-                alert('Please select a payment screenshot first!');
-                return;
-            }
+      // Initial load
+      if (orderNumber) {
+        loadOrderData();
+      } else {
+        document.body.innerHTML = `<div class="container"><div class="header"><h1>Error</h1></div>
+          <div class="content"><p>Order number required in URL parameters</p></div></div>`;
+      }
 
-            // Show loading
-            document.getElementById('loading').style.display = 'flex';
-            
-            try {
-                const reader = new FileReader();
-                reader.readAsDataURL(file);
-                
-                reader.onload = async () => {
-                    const base64Data = reader.result.split(',')[1];
-                    const payload = {
-                        orderNumber: document.getElementById('formOrderNumber').value,
-                        code: document.getElementById('formCode').value,
-                        name: document.getElementById('formName').value,
-                        price: document.getElementById('formPrice').value,
-                        branchPhone: document.getElementById('formBranchPhone').value,
-                        upload: {
-                            name: file.name,
-                            data: base64Data,
-                            contentType: file.type
-                        }
-                    };
-
-                    const response = await fetch(scriptUrl, {
-                        method: 'POST',
-                        body: JSON.stringify(payload),
-                        headers: { 'Content-Type': 'application/json' }
-                    });
-
-                    const data = await response.json();
-                    
-                    if (data.success) {
-                        const message = `Payment Confirmation\nOrder Number: ${data.orderNumber}\nCode: ${data.code}\nName: ${data.name}\nPrice: $${data.price}\nScreenshot: ${data.url}`;
-                        
-                        document.querySelector('.container').innerHTML = `
-                            <div class="header">
-                                <h1>Payment Confirmed</h1>
-                            </div>
-                            <div class="content">
-                                <p><strong>Order Number:</strong> ${data.orderNumber}</p>
-                                <p><strong>Code:</strong> ${data.code}</p>
-                                <p><strong>Name:</strong> ${data.name}</p>
-                                <p><strong>Price:</strong> $${data.price}</p>
-                                <p><strong>Receipt:</strong> <a href="${data.url}" target="_blank">View</a></p>
-                                <button onclick="window.open('https://wa.me/${data.branchPhone}?text=${encodeURIComponent(message)}', '_blank')" 
-                                    class="copy-btn">
-                                    Send via WhatsApp
-                                </button>
-                            </div>
-                        `;
-                    } else {
-                        throw new Error(data.error || 'Payment submission failed');
-                    }
-                };
-                
-            } catch (error) {
-                alert('Error: ' + error.message);
-            } finally {
-                document.getElementById('loading').style.display = 'none';
-            }
-        });
-
-        // Clipboard Function
-        async function copyToClipboard() {
-            try {
-                await navigator.clipboard.writeText(document.getElementById('accNum').textContent);
-                alert('Account number copied to clipboard!');
-            } catch (err) {
-                alert('Failed to copy! Please manually select the text.');
-            }
+      // Original copy function
+      async function copyToClipboard() {
+        try {
+          await navigator.clipboard.writeText(document.getElementById('accNum').innerText);
+          alert('Account number copied!');
+        } catch (err) {
+          alert('Failed to copy! Please manually select the text.');
         }
+      }
 
-        // Initialize when ready
-        window.addEventListener('DOMContentLoaded', initialize);
+      // Modified form submission
+      document.getElementById('paymentForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const file = e.target.uploadFile.files[0];
+        if (!file) return alert('Please select a payment screenshot!');
+
+        // Show loading state
+        const originalContent = document.body.innerHTML;
+        document.body.innerHTML = `<div class="container"><div class="header">
+          <h1>Processing Payment</h1></div><div class="content"><p>Please wait...</p></div></div>`;
+
+        try {
+          // Read file
+          const reader = new FileReader();
+          reader.readAsDataURL(file);
+          
+          reader.onload = async () => {
+            const base64Data = reader.result.split(',')[1];
+            const formData = {
+              orderNumber: orderNumber,
+              code: document.getElementById('hiddenCode').value,
+              name: document.getElementById('hiddenName').value,
+              price: document.getElementById('hiddenPrice').value,
+              branchPhone: document.getElementById('hiddenBranchPhone').value,
+              upload: {
+                name: file.name,
+                data: base64Data,
+                contentType: file.type
+              }
+            };
+
+            // Send to Apps Script
+            const response = await fetch(SCRIPT_URL, {
+              method: 'POST',
+              body: JSON.stringify(formData),
+              headers: { 'Content-Type': 'application/json' }
+            });
+            
+            const result = await response.json();
+            if (result.success) {
+              // Show success message
+              const message = `Payment Confirmation\nOrder: ${result.orderNumber}\nCode: ${result.code}\nName: ${result.name}\nPrice: $${result.price}\nReceipt: ${result.url}`;
+              document.body.innerHTML = `
+                <div class="container">
+                  <div class="header">
+                    <h1>Payment Confirmed</h1>
+                  </div>
+                  <div class="content">
+                    <!-- Success content from original Form.html -->
+                  </div>
+                </div>`;
+            } else {
+              throw new Error(result.error);
+            }
+          };
+        } catch (error) {
+          alert('Error: ' + error.message);
+          document.body.innerHTML = originalContent;
+        }
+      });
     </script>
-</body>
+  </body>
 </html>
