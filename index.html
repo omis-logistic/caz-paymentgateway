@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Payment Gateway</title>
+    <style>
+        /* Loading Screen */
+        #loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            flex-direction: column;
+        }
+
+        .loading-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #D4AF37;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Main Styles */
+        :root {
+            --gold: #D4AF37;
+            --white: #FFFFFF;
+            --text-dark: #333333;
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-text-size-adjust: none;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: var(--white);
+            color: var(--text-dark);
+            font-size: 14px;
+            line-height: 1.4;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            display: none; /* Hidden initially */
+        }
+
+        .header {
+            background: var(--gold);
+            padding: 15px;
+            text-align: center;
+            position: sticky;
+            top: 0;
+        }
+
+        .content {
+            padding: 20px;
+        }
+
+        .account-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        #accNum {
+            flex: 1;
+            padding: 12px;
+            background: #FFFBE6;
+            border: 1px solid var(--gold);
+            border-radius: 4px;
+            word-break: break-all;
+        }
+
+        .copy-btn, input[type="submit"] {
+            background: var(--gold);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+        }
+
+        input[type="file"] {
+            width: 100%;
+            padding: 12px;
+            margin: 20px 0;
+            border: 2px dashed var(--gold);
+            background: #FFFBE6;
+            border-radius: 4px;
+        }
+
+        @media (min-width: 768px) {
+            body {
+                padding: 20px;
+                background: #f0f0f0;
+            }
+            .container {
+                border-radius: 10px;
+                box-shadow: 0 2px 15px rgba(0,0,0,0.1);
+            }
+            .copy-btn {
+                width: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="loading">
+        <div class="loading-spinner"></div>
+        <p>Loading Order Details...</p>
+    </div>
+
+    <div class="container">
+        <div class="header">
+            <h1>Payment Gateway</h1>
+        </div>
+        
+        <div class="content">
+            <p><strong>Order Number:</strong> <span id="orderNumber"></span></p>
+            <p><strong>Code:</strong> <span id="code"></span></p>
+            <p><strong>Name:</strong> <span id="name"></span></p>
+            <p><strong>Price:</strong> $<span id="price"></span></p>
+            
+            <hr>
+            
+            <h3>Payment Instructions</h3>
+            <p style="color: var(--gold); font-weight: bold;">BIBD Transfer</p>
+            <div class="account-row">
+                <span id="accNum">00010010016466</span>
+                <button class="copy-btn" onclick="copyToClipboard()">Copy Account Number</button>
+            </div>
+            
+            <form id="paymentForm">
+                <input type="hidden" id="formOrderNumber" name="orderNumber">
+                <input type="hidden" id="formCode" name="code">
+                <input type="hidden" id="formName" name="name">
+                <input type="hidden" id="formPrice" name="price">
+                <input type="hidden" id="formBranchPhone" name="branchPhone">
+                
+                <p>Upload payment screenshot:</p>
+                <input type="file" name="uploadFile" accept="image/*" required>
+                <input type="submit" value="Submit Payment">
+            </form>
+        </div>
+    </div>
+
+    <script>
+  // Initialization
+  const scriptURL = 'https://script.google.com/macros/s/AKfycbzBCTFDvfyBg0yXvry5ffkV0lo_oB3P0_oRPvWjzRwzYdr4gT355zoIgRjUrv1-ChGC/exec'; // Replace with your deployment URL
+  
+  // DOM Elements
+  const paymentForm = document.getElementById('paymentForm');
+  const orderDisplay = {
+    number: document.getElementById('orderNumber'),
+    code: document.getElementById('code'),
+    name: document.getElementById('name'),
+    price: document.getElementById('price'),
+    branchPhone: document.getElementById('formBranchPhone')
+  };
+
+  // Load order details on page load
+  window.addEventListener('load', async () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const orderNumber = urlParams.get('orderNumber');
+    
+    if (!orderNumber) {
+      alert('Order number required in URL parameters');
+      return;
+    }
+
+    try {
+      const response = await fetch(`${scriptURL}?orderNumber=${orderNumber}`);
+      const html = await response.text();
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+      
+      // Extract values from virtual DOM
+      orderDisplay.number.textContent = orderNumber;
+      orderDisplay.code.textContent = doc.querySelector('p:nth-of-type(2)').textContent.split(': ')[1];
+      orderDisplay.name.textContent = doc.querySelector('p:nth-of-type(3)').textContent.split(': ')[1];
+      orderDisplay.price.textContent = doc.querySelector('p:nth-of-type(4)').textContent.split('$')[1];
+      
+      // Set form values
+      document.getElementById('formOrderNumber').value = orderNumber;
+      document.getElementById('formCode').value = orderDisplay.code.textContent;
+      document.getElementById('formName').value = orderDisplay.name.textContent;
+      document.getElementById('formPrice').value = orderDisplay.price.textContent;
+      document.getElementById('formBranchPhone').value = doc.querySelector('input[name="branchPhone"]').value;
+
+    } catch (error) {
+      alert(`Error loading order: ${error.message}`);
+      console.error('Order load error:', error);
+    }
+  });
+
+  // File upload handler
+  paymentForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const originalContent = document.body.innerHTML;
+    
+    // Show processing screen
+    document.body.innerHTML = `
+      <div class="container">
+        <div class="header">
+          <h1>Processing Payment</h1>
+        </div>
+        <div class="content">
+          <p>Please wait while we process your payment...</p>
+        </div>
+      </div>
+    `;
+
+    try {
+      const fileInput = e.target.uploadFile;
+      const file = fileInput.files[0];
+      
+      if (!file) {
+        throw new Error('Please select a payment screenshot first!');
+      }
+
+      // Read and encode file
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      
+      reader.onload = async () => {
+        const base64Data = reader.result.split(',')[1];
+        
+        const payload = {
+          orderNumber: document.getElementById('formOrderNumber').value,
+          upload: {
+            name: file.name,
+            data: base64Data,
+            contentType: file.type
+          }
+        };
+
+        try {
+          const response = await fetch(scriptURL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          
+          const result = await response.json();
+          
+          if (!result.success) {
+            throw new Error(result.error || 'Payment processing failed');
+          }
+
+          // Build WhatsApp message
+          const whatsappMessage = `Payment Confirmation
+Order Number: ${result.orderNumber}
+Code: ${result.code}
+Name: ${result.name}
+Price: $${result.price}
+Receipt: ${result.url}`;
+
+          // Show success screen
+          document.body.innerHTML = `
+            <div class="container">
+              <div class="header">
+                <h1>Payment Confirmed</h1>
+              </div>
+              <div class="content">
+                <p><strong>Order Number:</strong> ${result.orderNumber}</p>
+                <p><strong>Code:</strong> ${result.code}</p>
+                <p><strong>Name:</strong> ${result.name}</p>
+                <p><strong>Price:</strong> $${result.price}</p>
+                <p><strong>Receipt:</strong> <a href="${result.url}" target="_blank">View</a></p>
+                <button onclick="window.open('https://wa.me/${result.branchPhone}?text=${encodeURIComponent(whatsappMessage)}', '_blank')" 
+                  class="copy-btn">
+                  Confirm via WhatsApp
+                </button>
+              </div>
+            </div>
+          `;
+
+        } catch (error) {
+          alert(`Payment Error: ${error.message}`);
+          document.body.innerHTML = originalContent;
+        }
+      };
+
+    } catch (error) {
+      alert(error.message);
+      document.body.innerHTML = originalContent;
+    }
+  });
+
+  // Clipboard function
+  async function copyToClipboard() {
+    try {
+      await navigator.clipboard.writeText(document.getElementById('accNum').innerText);
+      alert('Account number copied!');
+    } catch (err) {
+      alert('Copy failed - please select text manually');
+    }
+  }
+</script>
+</body>
+</html>
