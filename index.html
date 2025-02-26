@@ -89,7 +89,7 @@
         font-size: 24px;
         color: var(--text-dark);
         margin: 4px 0 0 0;
-        font-weight: normal;
+        font-weight: 700;
     }
 
     /* Content */
@@ -107,7 +107,7 @@
 
     /* Order Details */
     #orderDetails p {
-        margin-bottom: 15px;
+        margin-bottom: 10px;
     }
 
     hr {
@@ -118,7 +118,7 @@
 
     /* Payment Instructions */
     .payment-instructions {
-        margin-top: 25px;
+        margin-top: 20px;
     }
 
     .payment-instructions::before {
@@ -127,7 +127,7 @@
         color: var(--dark-gold);
         font-weight: 700;
         font-size: 22px;
-        margin-bottom: 12px;
+        margin-bottom: 18px;
         letter-spacing: 0.5px;
         text-transform: uppercase;
     }
@@ -394,7 +394,7 @@ Receipt: ${data.url}`;
                 <p><strong>Receipt:</strong> <a href="${data.url}" target="_blank">View</a></p>
                 <button class="copy-btn" 
                     onclick="window.open('https://wa.me/${data.branchPhone}?text=${encodeURIComponent(message)}')">
-                    Confirm via WhatsApp
+                    Send via WhatsApp
                 </button>
             `;
             document.getElementById('confirmationContainer').classList.add('visible');
